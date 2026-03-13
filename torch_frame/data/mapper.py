@@ -419,12 +419,17 @@ class EmbeddingTensorMapper(TensorMapper):
             ser_list = ser.tolist()
             if self.batch_size is None:
                 values = self.embedder(ser_list)
+                # Materialization later persists tensor features; keep the
+                # intermediate embedding matrix on CPU to avoid peak GPU usage.
+                values = values.detach().cpu()
             else:
                 emb_list = []
                 for i in tqdm(range(0, len(ser_list), self.batch_size),
                               desc="Embedding raw data in mini-batch"):
                     emb = self.embedder(ser_list[i:i + self.batch_size])
-                    emb_list.append(emb.to(device))
+                    # Do not accumulate all batch embeddings on GPU before
+                    # concatenation; this creates an avoidable OOM spike.
+                    emb_list.append(emb.detach().cpu())
                 values = torch.cat(emb_list, dim=0)
         else:
             dtype = _get_default_numpy_dtype()
