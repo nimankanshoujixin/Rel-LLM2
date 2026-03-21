@@ -1,149 +1,405 @@
-# Rel-LLM: Large Language Models for Relational Database Learning (ACL 2025)
+# Rel-LLM
 
-[![RelBench](https://img.shields.io/badge/base%20dataset-RelBench-blue)](https://relbench.stanford.edu)
-[![ACL 2025 Submission](https://img.shields.io/badge/paper-ACL%202025-orange)]()
-[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](https://opensource.org/licenses/MIT)
+Rel-LLM is a relational learning project built on top of RelBench. The current training entrypoint is `main.py`.
 
-**Rel-LLM** is a framework that enables large language models (LLMs) to perform reasoning and prediction over structured relational databases. Built on top of [RelBench](https://relbench.stanford.edu), Rel-LLM combines graph neural networks (GNNs), temporal-aware subgraph sampling, and prompt-based conditioning for frozen LLMs.
+The runtime pipeline is:
 
-This repository supports our ACL 2025 paper:
-> *"Large Language Models are Good Relational Learners"*
+1. Load a temporal multi-table database from RelBench.
+2. Materialize table columns into `TensorFrame`.
+3. Build a heterogeneous graph from primary key / foreign key relations.
+4. Encode nodes with tabular encoders, temporal encoders, and `GraphSAGE`.
+5. Run one of two prediction backends:
+   - `GNN` mode: pure graph model output
+   - `LLM` mode: project graph embeddings into the LLM embedding space for classification or regression
 
----
-
-## 🌟 Highlights
-
-- 🔗 **Relational + Language Modeling**: Bridges multi-table relational structure with LLM reasoning capabilities.
-- 🧠 **GNN-Augmented Prompting**: Uses temporal-aware GraphSAGE and projection to format structured prompts.
-- 📊 **Full Benchmark Support**: Covers all 7 RelBench datasets and 30 diverse tasks.
-- 🧪 **Zero-shot & Finetuned**: Supports both inference-only and parameter-efficient finetuning regimes.
-- ⚙️ **GNN and LLM Interoperability**: Easy comparison with traditional GNN-only methods.
+This README is rewritten for the current code in this repository. The example commands below only use arguments that are actually supported by `main.py`.
 
 ---
 
-## 🧩 Architecture
+## Key Files
 
-![Rel-LLM Model Overview](./fig.png)
-
-**Rel-LLM Workflow**:
-1. Construct a heterogeneous entity graph from relational tables.
-2. Sample temporal-aware subgraphs at each prediction time point.
-3. Encode graph structure using a GNN (e.g., GraphSAGE).
-4. Project embeddings to LLM space and serialize as JSON prompts.
-5. Decode answers using frozen LLM with optional soft prompting.
+- `main.py`
+  - Training, validation, and test entrypoint
+- `model.py`
+  - Model definition for both GNN and LLM paths
+- `text_embedder.py`
+  - Text column embedding wrapper, supports `glove` and `mpnet`
+- `train_script.txt`
+  - Historical experiment command reference
+- `tune_hyperparameters.py`
+  - Optuna hyperparameter tuning wrapper for `main.py`
+- `HYPERPARAMETER_TUNING_GUIDE.md`
+  - Hyperparameter inventory and tuning strategy
+- `TUNE_SCRIPT_README.md`
+  - Short usage guide for the tuning script
+- `MAIN_PIPELINE_EXPLANATION.md`
+  - Detailed walkthrough of the `main.py` pipeline
 
 ---
 
-## 📦 Installation
+## Installation
 
-Install dependencies at once:
+Recommended setup:
+
 ```bash
 conda env create -f environment.yml
-conda activate llm 
-
-## Don’t pin pyg-lib / torch-scatter / torch-sparse / torch-cluster / torch-spline-conv in YAML. 
-pip install pyg-lib torch-scatter torch-sparse torch-cluster torch-spline-conv \
-  -f https://data.pyg.org/whl/torch-2.4.1+cu121.html
+conda activate llm
 ```
 
-Alternatively, manually install packages in turn:
-```bash
-conda create -n RDL python=3.11 && conda activate RDL
-pip install torch==2.5.0 torchvision==0.20.0 torchaudio==2.5.0 --index-url https://download.pytorch.org/whl/cu124
-pip install wandb pandas pillow pyarrow pooch
-pip install relbench
-pip install torch-frame 
-pip install -U sentence-transformers   # for Glove 
-pip install transformers peft
-```
+The environment file already includes the main dependencies used by this project:
 
-To enable modeling features via RelBench:
-```bash
-pip install relbench[full]
-pip install pytorch_frame[full]  
-```
+- `torch`
+- `torch-geometric`
+- `transformers`
+- `peft`
+- `sentence-transformers`
+- `relbench`
+- `optuna`
+- `wandb`
 
-Here, `Llama-3.1` is leveraged. Please log in to Huggingface for downloading the model weights directly. 
-
-
-
-## 🧪 Example Commands
-**rel-event** (classification):
-
-```bash
-python main.py --dataset=rel-event --task=user-ignore --epochs=3 --batch_size=2 \
-  --lr=0.0001 --dropout=0.2 --llm_frozen 
-```
-
-**rel-amazon** (regression):
-```bash
-python main.py --dataset=rel-amazon --task=user-ltv --epochs=10 --batch_size=1 \
-  --lr=0.0001 --dropout=0.2 --temporal_strategy=last \
-  --max_new_tokens=3 --text_embedder=mpnet
-```
-
-More example commands are available in `train_script.txt`.
-> Add `--debug` to disable Weights & Biases tracking.
-
-
-
-
-## 📚 Datasets
-
-Rel-LLM supports all 7 datasets and 30 tasks from [RelBench](https://relbench.stanford.edu):
-
-- 🏟 `rel-event`: Social event participation and churn
-- 🛍 `rel-amazon`: E-commerce user behavior and item lifespan
-- 💬 `rel-stack`: QA forum engagement and reputation prediction
-- 🧾 `rel-avito`: Ad visits and clickthrough prediction
-- 🏎 `rel-f1`: Racing analytics for drivers and outcomes
-- 🛒 `rel-hm`: H&M fashion sales forecasting
-- 🧪 `rel-trial`: Clinical trial success and adverse outcomes
-
-
+If this is a fresh machine, make sure the PyG-related packages match your CUDA and PyTorch versions.
 
 ---
 
-## 📈 Results Summary
+## Data And Model Downloads
 
-Rel-LLM significantly outperforms traditional baselines and in-context learning (ICL) methods on entity-level classification and regression tasks.
+### RelBench data
 
-- **Classification (AUROC ↑)**: +2 point gain over RDL and ICL+MLP
+`main.py` calls:
 
-- **Regression (MAE ↓)**: Lowest average MAE across tasks (12.31)
+```python
+get_dataset(..., download=True)
+get_task(..., download=True)
+```
 
-- **Zero-shot Viability**: Rel-Zero performs competitively without labels
+So the first run will download the required RelBench dataset and task files automatically.
+
+### HuggingFace models
+
+LLM mode can load models such as:
+
+- `meta-llama/Llama-3.2-1B`
+- `meta-llama/Llama-3.2-3B-Instruct`
+- `Qwen/Qwen2.5-7B-Instruct`
+- `deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B`
+- `deepseek-ai/DeepSeek-R1-Distill-Qwen-32B`
+
+If a model requires gated access, log in to HuggingFace first.
+
+### Text embedding models
+
+Raw text columns are embedded through `text_embedder.py`. Current options:
+
+- `glove`
+- `mpnet`
+
+Mapping:
+
+- `glove` -> `average_word_embeddings_glove.6B.300d`
+- `mpnet` -> `all-mpnet-base-v2`
 
 ---
 
-## 📖 Citation
+## Main Supported Arguments
 
-Please cite our work if you find it useful:
+### Data and cache
 
-    @article{wu2025large,
-    title={Large Language Models are Good Relational Learners},
-    author={Wu, Fang and Dwivedi, Vijay Prakash and Leskovec, Jure},
-    journal={arXiv preprint arXiv:2506.05725},
-    year={2025}
-    }
+- `--dataset`
+- `--task`
+- `--cache_dir`
+- `--debug`
 
-And also cite RelBench:
+### Graph model parameters
 
-    @misc{relbench,
-      title={RelBench: A Benchmark for Deep Learning on Relational Databases},
-      author={Robinson, Joshua and Ranjan, Rishabh and Hu, Weihua and Huang, Kexin and Han, Jiaqi and Dobles, Alejandro and others},
-      year={2024},
-      eprint={2407.20060},
-      archivePrefix={arXiv},
-      primaryClass={cs.LG}
-    }
+- `--channels`
+- `--aggr`
+- `--num_layers`
+- `--num_neighbors`
+- `--temporal_strategy`
+- `--text_embedder`
+- `--text_embedder_path`
+
+### LLM parameters
+
+- `--model_type`
+- `--llm_frozen`
+- `--output_mlp`
+- `--dropout`
+- `--num_demo`
+- `--max_new_tokens`
+- `--loss_class_weight`
+
+### Training parameters
+
+- `--epochs`
+- `--pretrain`
+- `--pretrain_epochs`
+- `--val_steps`
+- `--batch_size`
+- `--val_size`
+- `--num_workers`
+- `--lr`
+- `--wd`
+- `--seed`
+
+Important:
+
+- The current `main.py` does not support older arguments such as `--context` or `--context_table`.
+- Treat the `argparse` definitions in `main.py` as the source of truth.
 
 ---
 
-## 🤝 Acknowledgements
+## Common Training Commands
 
-This work builds on the excellent [RelBench](https://github.com/snap-stanford/relbench) benchmark and draws inspiration from literature on retrieval-augmented generation (RAG), prompt tuning, and relational deep learning.
+## LLM mode with frozen 1B model
 
-For questions, please open an issue or reach out to the authors (`fangwu97@stanford.edu`).
+This is the most common setup in the current repo.
 
+### Amazon `user-churn`
+
+```bash
+python main.py \
+  --dataset=rel-amazon \
+  --task=user-churn \
+  --epochs=20 \
+  --batch_size=1 \
+  --val_size=1 \
+  --lr=0.001 \
+  --wd=0.0015 \
+  --dropout=0.4 \
+  --val_steps=1000 \
+  --temporal_strategy=last \
+  --text_embedder=mpnet \
+  --llm_frozen \
+  --loss_class_weight 0.6 0.4
+```
+
+To disable `wandb`, add:
+
+```bash
+--debug
+```
+
+### Stack `user-engagement`
+
+```bash
+python main.py \
+  --dataset=rel-stack \
+  --task=user-engagement \
+  --epochs=10 \
+  --batch_size=256 \
+  --val_size=256 \
+  --lr=0.005 \
+  --wd=0.0015 \
+  --dropout=0.4 \
+  --val_steps=200 \
+  --temporal_strategy=last \
+  --text_embedder=mpnet \
+  --loss_class_weight 0.2 0.8
+```
+
+## Pure GNN mode
+
+If you do not want to load an LLM, set `model_type=gnn`:
+
+```bash
+python main.py \
+  --dataset=rel-stack \
+  --task=user-engagement \
+  --model_type=gnn \
+  --batch_size=512 \
+  --lr=0.005 \
+  --wd=0.15 \
+  --dropout=0.45 \
+  --val_steps=200
+```
+
+## LLM with `output_mlp`
+
+If you want to use the final hidden state plus an MLP head instead of text generation style output, add:
+
+```bash
+--output_mlp
+```
+
+Example:
+
+```bash
+python main.py \
+  --dataset=rel-trial \
+  --task=study-adverse \
+  --epochs=20 \
+  --batch_size=256 \
+  --val_size=256 \
+  --lr=0.0001 \
+  --wd=0.0015 \
+  --dropout=0.15 \
+  --val_steps=1000 \
+  --temporal_strategy=last \
+  --llm_frozen \
+  --text_embedder=mpnet \
+  --output_mlp \
+  --max_new_tokens=1
+```
+
+---
+
+## Logs And Cache
+
+### `wandb`
+
+If `--debug` is not set, training will try to initialize `wandb`:
+
+- Pretraining project: `rel-LLM-zero`
+- Finetuning project: `rel-LLM`
+
+If you only want local runs without online tracking, use:
+
+```bash
+--debug
+```
+
+### Cache directories
+
+Default cache directory:
+
+```bash
+~/.cache/relbench_examples
+```
+
+It stores:
+
+- task tables
+- graph construction intermediates
+- `stypes.json`
+- materialized tensor data
+
+Default text embedder cache directory:
+
+```bash
+./cache
+```
+
+You can override them with:
+
+```bash
+--cache_dir
+--text_embedder_path
+```
+
+---
+
+## Hyperparameter Tuning
+
+The repo includes an Optuna wrapper:
+
+```bash
+python tune_hyperparameters.py --gpu-id 0
+```
+
+A typical run:
+
+```bash
+python tune_hyperparameters.py \
+  --dataset rel-amazon \
+  --task user-churn \
+  --gpu-id 6 \
+  --n-trials 30 \
+  --epochs 5 \
+  --study-name amazon_user_churn_llama1b
+```
+
+The tuning script will:
+
+- sample hyperparameters
+- launch `main.py`
+- parse validation metrics
+- store trial logs under `optuna_runs/<study_name>/`
+- write the best result to `best_trial.json`
+
+See:
+
+- [HYPERPARAMETER_TUNING_GUIDE.md](./HYPERPARAMETER_TUNING_GUIDE.md)
+- [TUNE_SCRIPT_README.md](./TUNE_SCRIPT_README.md)
+
+---
+
+## GPU Notes
+
+The current code is single-GPU only.
+
+- `main.py` selects `cuda:0`
+- `model.py` loads the LLM with `device_map={"": 0}`
+
+So:
+
+- `CUDA_VISIBLE_DEVICES=6 python main.py ...`
+  means only physical GPU 6 is visible to the process
+- inside the process it is still treated as one GPU, `cuda:0`
+
+Text embedding memory usage is mainly affected by:
+
+- `mpnet` itself
+- materializing large text columns
+
+This repo already includes a fix for one text embedding materialization OOM issue: embedding chunks are no longer accumulated on GPU before `torch.cat`.
+
+---
+
+## FAQ
+
+### Why do some commands from the old README fail?
+
+Because the old README included arguments that are no longer present in the current codebase, especially:
+
+- `--context`
+- `--context_table`
+
+These are not defined in the current `main.py`.
+
+### How do I confirm the currently supported CLI arguments?
+
+Run:
+
+```bash
+python main.py --help
+```
+
+### How do I do a quick smoke test?
+
+Use:
+
+- `--debug`
+- fewer `epochs`
+- small `batch_size` and `val_size`
+
+Example:
+
+```bash
+python main.py \
+  --dataset=rel-amazon \
+  --task=user-churn \
+  --epochs=1 \
+  --batch_size=1 \
+  --val_size=1 \
+  --lr=0.001 \
+  --wd=0.0015 \
+  --dropout=0.4 \
+  --val_steps=1000 \
+  --temporal_strategy=last \
+  --text_embedder=mpnet \
+  --llm_frozen \
+  --loss_class_weight 0.6 0.4 \
+  --debug
+```
+
+---
+
+## Additional Docs
+
+If you want to understand the codebase before modifying it, start with:
+
+- [MAIN_PIPELINE_EXPLANATION.md](./MAIN_PIPELINE_EXPLANATION.md)
+- [HYPERPARAMETER_TUNING_GUIDE.md](./HYPERPARAMETER_TUNING_GUIDE.md)
+- [TUNE_SCRIPT_README.md](./TUNE_SCRIPT_README.md)
 
