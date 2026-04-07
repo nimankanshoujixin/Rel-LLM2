@@ -4,6 +4,7 @@ import random
 import copy
 
 import torch
+import torch.distributed as dist
 from torch import Tensor
 from torch.nn import Embedding, ModuleDict, Sigmoid, Sequential, Linear, Dropout
 
@@ -34,7 +35,7 @@ class Model(torch.nn.Module):
     def __init__(self, data: HeteroData, col_stats_dict: Dict[str, Dict[str, Dict[StatType, Any]]], num_layers: int, channels: int, out_channels: int, aggr: str,
                  norm: str = "batch_norm", dropout=0.0, shallow_list: List[NodeType] = [],  # List of node types to add shallow embeddings to input
                  id_awareness: bool = False, model_type: str = "meta-llama/Llama-3.2-1B", max_new_tokens=1, llm_frozen=False, output_mlp=False, output_probs=True, num_demo=4,
-                 dataset=None, task=None, gamma=2.0, alpha=[1.0, 1.0], mask_ratio=0.5, pretrain_random_table=False, pretrain_mask_cell=True):
+                 dataset=None, task=None, gamma=2.0, alpha=[1.0, 1.0], mask_ratio=0.5, pretrain_random_table=False, pretrain_mask_cell=True, device: torch.device | None = None):
         super().__init__()
         self.encoder = HeteroEncoder(channels=channels, node_to_col_names_dict={node_type: data[node_type].tf.col_names_dict for node_type in data.node_types},
                                      node_to_col_stats=col_stats_dict, )
@@ -58,9 +59,11 @@ class Model(torch.nn.Module):
         # https://huggingface.co/meta-llama/Llama-3.2-1B
         if model_type == 'gnn':
             self.model = None
-            print('Using default GNNs without LLMs')
+            if not dist.is_initialized() or dist.get_rank() == 0:
+                print('Using default GNNs without LLMs')
         else:
-            print('Loading LLAMA')
+            if not dist.is_initialized() or dist.get_rank() == 0:
+                print('Loading LLAMA')
             self.num_demo = num_demo
             self.dataset = dataset
             self.task = task
@@ -69,14 +72,18 @@ class Model(torch.nn.Module):
                                                            padding_side="left")  # https://huggingface.co/docs/transformers/llm_tutorial#wrong-padding-side
             self.tokenizer.pad_token = self.tokenizer.eos_token  # for padding, https://huggingface.co/meta-llama/Meta-Llama-3-8B/discussions/36
             self.tokenizer.add_special_tokens({'mask_token': '<MASK>'})  # add masked token
-            model = AutoModelForCausalLM.from_pretrained(model_type, torch_dtype=torch.float16, low_cpu_mem_usage=True, device_map={"": 0})  # 16 instead of 32 with less memory!
+            model = AutoModelForCausalLM.from_pretrained(model_type, torch_dtype=torch.float16, low_cpu_mem_usage=True)  # 16 instead of 32 with less memory!
+            if device is not None:
+                model = model.to(device)
             model.resize_token_embeddings(len(self.tokenizer))  # expand vocab due to '<MASK>', https://huggingface.co/docs/transformers/en/main_classes/tokenizer
             if llm_frozen:
-                print("Freezing LLAMA!")
+                if not dist.is_initialized() or dist.get_rank() == 0:
+                    print("Freezing LLAMA!")
                 for name, param in model.named_parameters():
                     param.requires_grad = False
             else:
-                print("Training LLAMA with LORA!")  # TODO: use_dora=True
+                if not dist.is_initialized() or dist.get_rank() == 0:
+                    print("Training LLAMA with LORA!")  # TODO: use_dora=True
                 from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
                 model = prepare_model_for_kbit_training(model)
                 lora_r: int = 8
@@ -87,17 +94,18 @@ class Model(torch.nn.Module):
                 model = get_peft_model(model, config)
 
             self.model = model
+            self.model_device = next(self.model.parameters()).device
             self.word_embedding = self.model.model.get_input_embeddings()
             if model_type == "Qwen/Qwen2.5-7B-Instruct":
                 out_dim = 3584
             elif model_type == "meta-llama/Llama-3.2-1B":
                 out_dim = 2048
-            self.projector = Sequential(Linear(channels, 1024), Sigmoid(), Dropout(dropout), Linear(1024, out_dim), Dropout(dropout)).to(self.model.device)
+            self.projector = Sequential(Linear(channels, 1024), Sigmoid(), Dropout(dropout), Linear(1024, out_dim), Dropout(dropout)).to(self.model_device)
             self.lm_head = MLP(out_dim, out_channels=out_channels, norm=norm, num_layers=1, dropout=dropout) if self.output_mlp else None
 
             # cached token embeddings
-            self.bos_embeds = self.word_embedding(self.tokenizer(BOS, add_special_tokens=False, return_tensors='pt').input_ids[0].to(self.model.device))
-            self.pad_embeds = self.word_embedding(torch.tensor(self.tokenizer.pad_token_id).to(self.model.device)).unsqueeze(0)
+            self.bos_embeds = self.word_embedding(self.tokenizer(BOS, add_special_tokens=False, return_tensors='pt').input_ids[0].to(self.model_device))
+            self.pad_embeds = self.word_embedding(torch.tensor(self.tokenizer.pad_token_id).to(self.model_device)).unsqueeze(0)
 
         self.reset_parameters()
 
@@ -329,7 +337,9 @@ class Model(torch.nn.Module):
                 all_embeddings.append(recursive_collect(target_type, target_id, neighbors))
         return torch.cat(all_embeddings) if all_embeddings else None
 
-    def forward(self, batch: HeteroData, entity_table: NodeType, context=True, demo_info=None, inference: bool = False) -> Tensor:
+    def forward(self, batch: HeteroData, entity_table: NodeType, context=True, demo_info=None, inference: bool = False, pretrain_mode: bool = False) -> Tensor:
+        if pretrain_mode:
+            return self.pretrain(batch, entity_table)
         x_dict, batch_size = self.encode(batch, entity_table)
 
         # num_sampled_nodes_dict ->  the number of sampled nodes for each node type at each layer (hop)

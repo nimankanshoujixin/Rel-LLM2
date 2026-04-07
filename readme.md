@@ -180,6 +180,37 @@ To disable `wandb`, add:
 --debug
 ```
 
+## DDP multi-GPU launch
+
+The current repo now supports single-node DDP training through `torchrun`.
+
+If your server has NCCL P2P issues, launch with:
+
+```bash
+NCCL_P2P_DISABLE=1 torchrun --nproc_per_node=4 main.py \
+  --dataset=rel-amazon \
+  --task=user-churn \
+  --epochs=20 \
+  --batch_size=1 \
+  --val_size=1 \
+  --lr=0.001 \
+  --wd=0.0015 \
+  --dropout=0.4 \
+  --val_steps=1000 \
+  --temporal_strategy=last \
+  --text_embedder=mpnet \
+  --llm_frozen \
+  --loss_class_weight 0.6 0.4 \
+  --debug
+```
+
+In DDP mode:
+
+- `batch_size` means per-GPU batch size
+- global batch size is `batch_size * number_of_gpus`
+- rank 0 handles `wandb` logging and console summaries
+- validation and test predictions are gathered across ranks before metric computation
+
 ### Stack `user-engagement`
 
 ```bash
@@ -326,16 +357,24 @@ See:
 
 ## GPU Notes
 
-The current code is single-GPU only.
+The current code supports:
 
-- `main.py` selects `cuda:0`
-- `model.py` loads the LLM with `device_map={"": 0}`
+- single-GPU execution through `python main.py ...`
+- single-node multi-GPU execution through `torchrun`
+
+Recommended DDP launch pattern:
+
+```bash
+NCCL_P2P_DISABLE=1 torchrun --nproc_per_node=<NUM_GPUS> main.py ...
+```
 
 So:
 
 - `CUDA_VISIBLE_DEVICES=6 python main.py ...`
   means only physical GPU 6 is visible to the process
 - inside the process it is still treated as one GPU, `cuda:0`
+- `NCCL_P2P_DISABLE=1 torchrun --nproc_per_node=4 main.py ...`
+  launches 4 DDP worker processes, one per visible GPU
 
 Text embedding memory usage is mainly affected by:
 
@@ -402,4 +441,3 @@ If you want to understand the codebase before modifying it, start with:
 - [MAIN_PIPELINE_EXPLANATION.md](./MAIN_PIPELINE_EXPLANATION.md)
 - [HYPERPARAMETER_TUNING_GUIDE.md](./HYPERPARAMETER_TUNING_GUIDE.md)
 - [TUNE_SCRIPT_README.md](./TUNE_SCRIPT_README.md)
-

@@ -80,13 +80,31 @@ def parse_args() -> argparse.Namespace:
         "--python-executable",
         type=str,
         default=sys.executable,
-        help="Python executable used to launch main.py.",
+        help="Python executable used to launch main.py or torch.distributed.run.",
+    )
+    parser.add_argument(
+        "--nproc-per-node",
+        type=int,
+        default=1,
+        help="Use DDP launch when greater than 1.",
+    )
+    parser.add_argument(
+        "--master-port",
+        type=int,
+        default=29500,
+        help="Master port used by torchrun in DDP mode.",
     )
     parser.add_argument(
         "--gpu-id",
         type=str,
         default=None,
         help="If set, exports CUDA_VISIBLE_DEVICES to this value for each trial.",
+    )
+    parser.add_argument(
+        "--nccl-p2p-disable",
+        type=str,
+        default="1",
+        help="Export NCCL_P2P_DISABLE for each trial. Default is 1.",
     )
     parser.add_argument("--cache-dir", type=str, default=None)
     parser.add_argument("--text-embedder-path", type=str, default=None)
@@ -182,8 +200,7 @@ def build_trial_command(args: argparse.Namespace, trial: optuna.Trial) -> tuple[
         "w_pos": trial.suggest_float("w_pos", 0.5, 3.0),
     }
 
-    command = [
-        args.python_executable,
+    main_command = [
         "main.py",
         f"--dataset={args.dataset}",
         f"--task={args.task}",
@@ -206,6 +223,18 @@ def build_trial_command(args: argparse.Namespace, trial: optuna.Trial) -> tuple[
         "1.0",
         str(params["w_pos"]),
     ]
+
+    if args.nproc_per_node > 1:
+        command = [
+            args.python_executable,
+            "-m",
+            "torch.distributed.run",
+            f"--nproc_per_node={args.nproc_per_node}",
+            f"--master_port={args.master_port}",
+            *main_command,
+        ]
+    else:
+        command = [args.python_executable, *main_command]
 
     if args.cache_dir:
         command.append(f"--cache_dir={args.cache_dir}")
@@ -257,6 +286,7 @@ def objective_factory(
         env["PYTHONUNBUFFERED"] = "1"
         if args.gpu_id is not None:
             env["CUDA_VISIBLE_DEVICES"] = args.gpu_id
+        env["NCCL_P2P_DISABLE"] = args.nccl_p2p_disable
 
         best_metric: float | None = None
         eval_step = 0
