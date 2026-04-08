@@ -57,6 +57,7 @@ During tuning:
 
 - intermediate trial runs do not execute the test split
 - the test split is run only once, after the best trial is selected
+- `--reset-study` removes both the existing Optuna study record and `optuna_runs/<study_name>/` before starting
 
 ---
 
@@ -69,6 +70,7 @@ Most commonly:
 - `--gpu-id`
 - `--n-trials`
 - `--train-steps`
+- `--reset-study` when you want a fresh run with the same study name
 
 For DDP tuning:
 
@@ -79,6 +81,7 @@ For DDP tuning:
 Other useful arguments:
 
 - `--study-name`
+- `--reset-study`
 - `--storage`
 - `--timeout`
 - `--val-steps`

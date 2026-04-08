@@ -3,6 +3,7 @@ import ast
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -27,6 +28,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--dataset", type=str, default="rel-amazon")
     parser.add_argument("--task", type=str, default="user-churn")
     parser.add_argument("--study-name", type=str, default=None)
+    parser.add_argument(
+        "--reset-study",
+        action="store_true",
+        help="Delete the existing study with the same name and remove its output directory before running.",
+    )
     parser.add_argument(
         "--storage",
         type=str,
@@ -177,6 +183,23 @@ def safe_parse_metrics(line: str, regex: re.Pattern[str]) -> dict[str, float] | 
     if not isinstance(metrics, dict):
         return None
     return metrics
+
+
+def reset_study_if_requested(
+    args: argparse.Namespace,
+    study_name: str,
+    output_dir: Path,
+) -> None:
+    if not args.reset_study:
+        return
+
+    if output_dir.exists():
+        shutil.rmtree(output_dir)
+
+    try:
+        optuna.delete_study(study_name=study_name, storage=args.storage)
+    except KeyError:
+        pass
 
 
 def build_main_command(
@@ -447,6 +470,7 @@ def main() -> None:
     args = parse_args()
     study_name = args.study_name or f"{args.dataset}_{args.task}_tuning"
     output_dir = Path(args.output_dir) / study_name
+    reset_study_if_requested(args, study_name, output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
     tune_metric, higher_is_better = get_tuning_target(args.dataset, args.task)

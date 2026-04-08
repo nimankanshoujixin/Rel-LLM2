@@ -357,6 +357,12 @@ python tune_hyperparameters.py \
   --study-name amazon_user_churn_llama1b
 ```
 
+If you want to restart the same study name from scratch instead of resuming it, add:
+
+```bash
+--reset-study
+```
+
 The tuning script will:
 
 - sample hyperparameters
