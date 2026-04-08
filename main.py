@@ -235,11 +235,18 @@ def test(
     device: torch.device,
     demo_info=None,
     max_steps: int | None = None,
+    progress_desc: str | None = None,
 ) -> np.ndarray:
     model.eval()
     pred_list = []
+    total_steps = len(loader) if max_steps is None else min(len(loader), max_steps)
     for step_idx, test_batch in enumerate(
-        tqdm(loader, disable=not is_main_process()),
+        tqdm(
+            loader,
+            total=total_steps,
+            desc=progress_desc,
+            disable=not is_main_process(),
+        ),
         start=1,
     ):
         if max_steps is not None and step_idx > max_steps:
@@ -479,6 +486,7 @@ def main() -> None:
                             device,
                             demo,
                             max_steps=args.eval_steps,
+                            progress_desc="[Val]",
                         )
                         val_metrics = task.evaluate(val_pred, task.get_table("val"))
                         if run is not None:
@@ -500,6 +508,7 @@ def main() -> None:
                                 device,
                                 demo,
                                 max_steps=args.eval_steps,
+                                progress_desc="[Test]",
                             )
                             test_metrics = task.evaluate(test_pred)
                             best_test_metric = test_metrics[tune_metric]
@@ -532,12 +541,15 @@ def main() -> None:
             model_for_io.load_state_dict(state_dict)
 
         best_val_metric = -math.inf if higher_is_better else math.inf
-        epoch = 0
         while steps < args.train_steps:
-            epoch += 1
             loss_accum = count_accum = 0
-            tq = tqdm(loader_dict["train"], total=len(loader_dict["train"]), disable=not is_main_process())
-            for batch in tq:
+            remaining_steps = args.train_steps - steps
+            tq = tqdm(
+                loader_dict["train"],
+                total=min(len(loader_dict["train"]), remaining_steps),
+                disable=not is_main_process(),
+            )
+            for batch_idx, batch in enumerate(tq, start=1):
                 model.train()
                 batch = batch.to(device)
                 nums_samples = batch[entity_table].y.size(0)
@@ -563,7 +575,12 @@ def main() -> None:
                 if run is not None:
                     for k, v in summary.items():
                         run.log({f"train/{k}": v}, step=steps)
-                tq.set_description(f"[Train] Epoch/Step: {epoch:02d}/{steps} | Train loss: {train_loss:3f}")
+                current_train_step = min(batch_idx, remaining_steps)
+                tq.set_description(
+                    f"[Train] Step: {steps}/{args.train_steps} | "
+                    f"Cycle step: {current_train_step}/{min(len(loader_dict['train']), remaining_steps)} | "
+                    f"Train loss: {train_loss:3f}"
+                )
 
                 if steps % args.val_steps == 0:
                     val_pred = test(
@@ -573,6 +590,7 @@ def main() -> None:
                         args,
                         device,
                         max_steps=args.eval_steps,
+                        progress_desc="[Val]",
                     )
                     val_metrics = task.evaluate(val_pred, task.get_table("val"))
                     test_pred = test(
@@ -582,6 +600,7 @@ def main() -> None:
                         args,
                         device,
                         max_steps=args.eval_steps,
+                        progress_desc="[Test]",
                     )
                     test_metrics = task.evaluate(test_pred)
                     if run is not None:
@@ -600,7 +619,8 @@ def main() -> None:
                         state_dict = copy.deepcopy(model_for_io.state_dict())
                     scheduler.step(val_metrics[tune_metric])
                     rank_print(
-                        f"[Eval] Epoch/Step: {epoch:02d}/{steps} | "
+                        f"[Eval] Train step: {steps}/{args.train_steps} | "
+                        f"Eval cap: {args.eval_steps} step(s) | "
                         f"Val: {val_metrics} | Test: {test_metrics} | "
                         f"Best val: {best_val_metric:.4f}"
                     )
@@ -619,6 +639,7 @@ def main() -> None:
             args,
             device,
             max_steps=args.eval_steps,
+            progress_desc="[Val]",
         )
         val_metrics = task.evaluate(val_pred, task.get_table("val"))
         test_pred = test(
@@ -628,6 +649,7 @@ def main() -> None:
             args,
             device,
             max_steps=args.eval_steps,
+            progress_desc="[Test]",
         )
         test_metrics = task.evaluate(test_pred)
         rank_print(f"Best Val metrics: {val_metrics}")
