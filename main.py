@@ -181,7 +181,7 @@ def build_loader_dict(
     loader_dict: Dict[str, NeighborLoader] = {}
     entity_table = None
     for split in ["train", "val", "test"]:
-        table = task.get_table(split)
+        table = task.get_table(split, mask_input_cols=False)
         table_input = get_node_train_table_input(table=table, task=task)
         entity_table = table_input.nodes[0]
         if world_size > 1:
