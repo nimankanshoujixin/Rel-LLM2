@@ -227,7 +227,7 @@ def gather_predictions(local_pred: np.ndarray) -> np.ndarray:
 
 
 @torch.no_grad()
-def test(
+def run_inference(
     loader: NeighborLoader,
     model: torch.nn.Module,
     task,
@@ -236,9 +236,10 @@ def test(
     demo_info=None,
     max_steps: int | None = None,
     progress_desc: str | None = None,
-) -> np.ndarray:
+) -> tuple[np.ndarray, np.ndarray | None]:
     model.eval()
     pred_list = []
+    target_list = []
     total_steps = len(loader) if max_steps is None else min(len(loader), max_steps)
     for step_idx, test_batch in enumerate(
         tqdm(
@@ -266,12 +267,74 @@ def test(
 
         pred = pred.view(-1) if len(pred.size()) > 1 and pred.size(1) == 1 else pred
         pred_list.append(pred.detach().cpu())
+        if hasattr(test_batch[task.entity_table], "y"):
+            target = test_batch[task.entity_table].y
+            target = target.view(-1) if len(target.size()) > 1 and target.size(1) == 1 else target
+            target_list.append(target.detach().cpu())
 
     if pred_list:
         local_pred = torch.cat(pred_list, dim=0).numpy()
     else:
         local_pred = np.array([])
-    return gather_predictions(local_pred)
+    local_target = None
+    if target_list:
+        local_target = torch.cat(target_list, dim=0).numpy()
+    return gather_predictions(local_pred), (
+        gather_predictions(local_target) if local_target is not None else None
+    )
+
+
+@torch.no_grad()
+def test(
+    loader: NeighborLoader,
+    model: torch.nn.Module,
+    task,
+    args: argparse.Namespace,
+    device: torch.device,
+    demo_info=None,
+    max_steps: int | None = None,
+    progress_desc: str | None = None,
+) -> np.ndarray:
+    pred, _ = run_inference(
+        loader,
+        model,
+        task,
+        args,
+        device,
+        demo_info=demo_info,
+        max_steps=max_steps,
+        progress_desc=progress_desc,
+    )
+    return pred
+
+
+def evaluate_loader(
+    loader: NeighborLoader,
+    model: torch.nn.Module,
+    task,
+    args: argparse.Namespace,
+    device: torch.device,
+    demo_info=None,
+    max_steps: int | None = None,
+    progress_desc: str | None = None,
+) -> dict[str, float]:
+    pred, target = run_inference(
+        loader,
+        model,
+        task,
+        args,
+        device,
+        demo_info=demo_info,
+        max_steps=max_steps,
+        progress_desc=progress_desc,
+    )
+    if target is None:
+        raise ValueError("Evaluation loader did not provide target labels.")
+    if len(pred) != len(target):
+        raise ValueError(
+            f"The length of pred and target must be the same (got {len(pred)} and {len(target)})."
+        )
+    return {fn.__name__: fn(target, pred) for fn in task.metrics}
 
 
 def parse_args() -> argparse.Namespace:
@@ -478,7 +541,7 @@ def main() -> None:
                         if args.num_demo > 0:
                             demo_batch = next(iter(loader_dict["train"])).to(device)
                             demo = model_for_io.get_demo_info(demo_batch, task.entity_table)
-                        val_pred = test(
+                        val_metrics = evaluate_loader(
                             loader_dict["val"],
                             model,
                             task,
@@ -488,7 +551,6 @@ def main() -> None:
                             max_steps=args.eval_steps,
                             progress_desc="[Val]",
                         )
-                        val_metrics = task.evaluate(val_pred, task.get_table("val"))
                         if run is not None:
                             for k, v in val_metrics.items():
                                 run.log({f"val/{k}": v}, step=pretrain_steps)
@@ -500,7 +562,7 @@ def main() -> None:
                         )
                         if improved:
                             best_val_metric = val_metrics[tune_metric]
-                            test_pred = test(
+                            test_metrics = evaluate_loader(
                                 loader_dict["test"],
                                 model,
                                 task,
@@ -510,7 +572,6 @@ def main() -> None:
                                 max_steps=args.eval_steps,
                                 progress_desc="[Test]",
                             )
-                            test_metrics = task.evaluate(test_pred)
                             best_test_metric = test_metrics[tune_metric]
                             if run is not None:
                                 for k, v in test_metrics.items():
@@ -583,7 +644,7 @@ def main() -> None:
                 )
 
                 if steps % args.val_steps == 0:
-                    val_pred = test(
+                    val_metrics = evaluate_loader(
                         loader_dict["val"],
                         model,
                         task,
@@ -592,8 +653,7 @@ def main() -> None:
                         max_steps=args.eval_steps,
                         progress_desc="[Val]",
                     )
-                    val_metrics = task.evaluate(val_pred, task.get_table("val"))
-                    test_pred = test(
+                    test_metrics = evaluate_loader(
                         loader_dict["test"],
                         model,
                         task,
@@ -602,7 +662,6 @@ def main() -> None:
                         max_steps=args.eval_steps,
                         progress_desc="[Test]",
                     )
-                    test_metrics = task.evaluate(test_pred)
                     if run is not None:
                         for k, v in val_metrics.items():
                             run.log({f"val/{k}": v}, step=steps)
@@ -632,7 +691,7 @@ def main() -> None:
             state_dict = copy.deepcopy(model_for_io.state_dict())
         model_for_io.load_state_dict(state_dict)
 
-        val_pred = test(
+        val_metrics = evaluate_loader(
             loader_dict["val"],
             model,
             task,
@@ -641,8 +700,7 @@ def main() -> None:
             max_steps=args.eval_steps,
             progress_desc="[Val]",
         )
-        val_metrics = task.evaluate(val_pred, task.get_table("val"))
-        test_pred = test(
+        test_metrics = evaluate_loader(
             loader_dict["test"],
             model,
             task,
@@ -651,7 +709,6 @@ def main() -> None:
             max_steps=args.eval_steps,
             progress_desc="[Test]",
         )
-        test_metrics = task.evaluate(test_pred)
         rank_print(f"Best Val metrics: {val_metrics}")
         rank_print(f"Best test metrics: {test_metrics}")
         if run is not None:
