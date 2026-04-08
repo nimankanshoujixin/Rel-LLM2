@@ -86,6 +86,12 @@ LLM mode can load models such as:
 
 If a model requires gated access, log in to HuggingFace first.
 
+`--model_type` can also be a local model directory, for example:
+
+```bash
+--model_type=./Llama-3.2-1B
+```
+
 ### Text embedding models
 
 Raw text columns are embedded through `text_embedder.py`. Current options:

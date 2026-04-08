@@ -96,10 +96,7 @@ class Model(torch.nn.Module):
             self.model = model
             self.model_device = next(self.model.parameters()).device
             self.word_embedding = self.model.model.get_input_embeddings()
-            if model_type == "Qwen/Qwen2.5-7B-Instruct":
-                out_dim = 3584
-            elif model_type == "meta-llama/Llama-3.2-1B":
-                out_dim = 2048
+            out_dim = self.word_embedding.embedding_dim
             self.projector = Sequential(Linear(channels, 1024), Sigmoid(), Dropout(dropout), Linear(1024, out_dim), Dropout(dropout)).to(self.model_device)
             self.lm_head = MLP(out_dim, out_channels=out_channels, norm=norm, num_layers=1, dropout=dropout) if self.output_mlp else None
 

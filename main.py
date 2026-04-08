@@ -289,14 +289,7 @@ def parse_args() -> argparse.Namespace:
         "--model_type",
         type=str,
         default="meta-llama/Llama-3.2-1B",
-        choices=[
-            "deepseek-ai/DeepSeek-R1-Distill-Qwen-32B",
-            "deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B",
-            "Qwen/Qwen2.5-7B-Instruct",
-            "meta-llama/Llama-3.2-1B",
-            "meta-llama/Llama-3.2-3B-Instruct",
-            "gnn",
-        ],
+        help="HuggingFace model id, local model directory, or 'gnn'.",
     )
     parser.add_argument("--llm_frozen", action="store_true")
     parser.add_argument("--output_mlp", action="store_true")
