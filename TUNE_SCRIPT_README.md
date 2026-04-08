@@ -25,8 +25,9 @@ This means the default tuning scenario is:
 
 These are also fixed unless you override them manually:
 
-- `epochs`
+- `train_steps`
 - `val_steps`
+- `eval_steps`
 - `val_size`
 - `seed`
 - `dataset`
@@ -44,6 +45,12 @@ Code-internal hyperparameters are not tuned by this script, including:
 - scheduler settings
 - optimizer betas
 
+Semantics:
+
+- `train_steps` is the total finetuning budget passed to `main.py`
+- `val_steps` controls how often intermediate evaluation is triggered
+- `eval_steps` caps how many validation/test loader batches each evaluation pass consumes
+
 ---
 
 ## Arguments you should decide before running
@@ -54,7 +61,7 @@ Most commonly:
 - `--task`
 - `--gpu-id`
 - `--n-trials`
-- `--epochs`
+- `--train-steps`
 
 For DDP tuning:
 
@@ -68,6 +75,7 @@ Other useful arguments:
 - `--storage`
 - `--timeout`
 - `--val-steps`
+- `--eval-steps`
 - `--val-size`
 - `--cache-dir`
 - `--text-embedder-path`
@@ -171,7 +179,8 @@ python tune_hyperparameters.py \
   --task user-churn \
   --gpu-id 6 \
   --n-trials 30 \
-  --epochs 5 \
+  --train-steps 4096 \
+  --eval-steps 1024 \
   --study-name amazon_user_churn_llama1b
 ```
 
@@ -186,7 +195,8 @@ python tune_hyperparameters.py \
   --master-port 29501 \
   --nccl-p2p-disable 1 \
   --n-trials 30 \
-  --epochs 5 \
+  --train-steps 4096 \
+  --eval-steps 1024 \
   --study-name amazon_user_churn_llama1b_ddp
 ```
 
@@ -218,4 +228,3 @@ The script writes:
 
 - Optuna study database:
   - by default: `sqlite:///optuna_rel_llm.db`
-

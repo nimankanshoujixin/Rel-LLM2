@@ -137,10 +137,11 @@ Mapping:
 
 ### Training parameters
 
-- `--epochs`
+- `--train_steps`
 - `--pretrain`
 - `--pretrain_epochs`
 - `--val_steps`
+- `--eval_steps`
 - `--batch_size`
 - `--val_size`
 - `--num_workers`
@@ -152,6 +153,9 @@ Important:
 
 - The current `main.py` does not support older arguments such as `--context` or `--context_table`.
 - Treat the `argparse` definitions in `main.py` as the source of truth.
+- `--train_steps` is the finetuning budget and replaces the old epoch-based budget.
+- `--val_steps` controls how often validation runs during training.
+- `--eval_steps` caps how many loader batches are consumed per validation/test pass.
 
 ---
 
@@ -167,13 +171,14 @@ This is the most common setup in the current repo.
 python main.py \
   --dataset=rel-amazon \
   --task=user-churn \
-  --epochs=20 \
+  --train_steps=32768 \
   --batch_size=1 \
   --val_size=1 \
   --lr=0.001 \
   --wd=0.0015 \
   --dropout=0.4 \
   --val_steps=1000 \
+  --eval_steps=1024 \
   --temporal_strategy=last \
   --text_embedder=mpnet \
   --llm_frozen \
@@ -196,13 +201,14 @@ If your server has NCCL P2P issues, launch with:
 NCCL_P2P_DISABLE=1 torchrun --nproc_per_node=4 main.py \
   --dataset=rel-amazon \
   --task=user-churn \
-  --epochs=20 \
+  --train_steps=32768 \
   --batch_size=1 \
   --val_size=1 \
   --lr=0.001 \
   --wd=0.0015 \
   --dropout=0.4 \
   --val_steps=1000 \
+  --eval_steps=1024 \
   --temporal_strategy=last \
   --text_embedder=mpnet \
   --llm_frozen \
@@ -223,13 +229,14 @@ In DDP mode:
 python main.py \
   --dataset=rel-stack \
   --task=user-engagement \
-  --epochs=10 \
+  --train_steps=8192 \
   --batch_size=256 \
   --val_size=256 \
   --lr=0.005 \
   --wd=0.0015 \
   --dropout=0.4 \
   --val_steps=200 \
+  --eval_steps=1024 \
   --temporal_strategy=last \
   --text_embedder=mpnet \
   --loss_class_weight 0.2 0.8
@@ -265,13 +272,14 @@ Example:
 python main.py \
   --dataset=rel-trial \
   --task=study-adverse \
-  --epochs=20 \
+  --train_steps=32768 \
   --batch_size=256 \
   --val_size=256 \
   --lr=0.0001 \
   --wd=0.0015 \
   --dropout=0.15 \
   --val_steps=1000 \
+  --eval_steps=1024 \
   --temporal_strategy=last \
   --llm_frozen \
   --text_embedder=mpnet \
@@ -342,7 +350,8 @@ python tune_hyperparameters.py \
   --task user-churn \
   --gpu-id 6 \
   --n-trials 30 \
-  --epochs 5 \
+  --train-steps 4096 \
+  --eval-steps 1024 \
   --study-name amazon_user_churn_llama1b
 ```
 
@@ -415,7 +424,7 @@ python main.py --help
 Use:
 
 - `--debug`
-- fewer `epochs`
+- fewer `train_steps`
 - small `batch_size` and `val_size`
 
 Example:
@@ -424,13 +433,14 @@ Example:
 python main.py \
   --dataset=rel-amazon \
   --task=user-churn \
-  --epochs=1 \
+  --train_steps=128 \
   --batch_size=1 \
   --val_size=1 \
   --lr=0.001 \
   --wd=0.0015 \
   --dropout=0.4 \
   --val_steps=1000 \
+  --eval_steps=64 \
   --temporal_strategy=last \
   --text_embedder=mpnet \
   --llm_frozen \

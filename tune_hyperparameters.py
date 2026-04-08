@@ -37,8 +37,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--startup-trials", type=int, default=8)
     parser.add_argument("--prune-warmup-steps", type=int, default=1)
-    parser.add_argument("--epochs", type=int, default=5)
+    parser.add_argument("--train-steps", type=int, default=2**15)
     parser.add_argument("--val-steps", type=int, default=500)
+    parser.add_argument("--eval-steps", type=int, default=1024)
     parser.add_argument("--val-size", type=int, default=1)
     parser.add_argument(
         "--batch-size-choices",
@@ -206,8 +207,9 @@ def build_trial_command(args: argparse.Namespace, trial: optuna.Trial) -> tuple[
         f"--task={args.task}",
         f"--model_type={args.model_type}",
         f"--text_embedder={args.text_embedder}",
-        f"--epochs={args.epochs}",
+        f"--train_steps={args.train_steps}",
         f"--val_steps={args.val_steps}",
+        f"--eval_steps={args.eval_steps}",
         f"--val_size={args.val_size}",
         f"--channels={params['channels']}",
         f"--num_layers={params['num_layers']}",

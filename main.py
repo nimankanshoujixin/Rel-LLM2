@@ -234,10 +234,16 @@ def test(
     args: argparse.Namespace,
     device: torch.device,
     demo_info=None,
+    max_steps: int | None = None,
 ) -> np.ndarray:
     model.eval()
     pred_list = []
-    for test_batch in tqdm(loader, disable=not is_main_process()):
+    for step_idx, test_batch in enumerate(
+        tqdm(loader, disable=not is_main_process()),
+        start=1,
+    ):
+        if max_steps is not None and step_idx > max_steps:
+            break
         test_batch = test_batch.to(device)
         pred = model(test_batch, task.entity_table, demo_info=demo_info, inference=True)
         if task.task_type == TaskType.REGRESSION:
@@ -298,10 +304,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--max_new_tokens", type=int, default=1)
     parser.add_argument("--loss_class_weight", nargs="+", type=float, default=None)
 
-    parser.add_argument("--epochs", type=int, default=100)
+    parser.add_argument("--train_steps", type=int, default=2**15)
     parser.add_argument("--pretrain", action="store_true")
     parser.add_argument("--pretrain_epochs", type=int, default=200)
     parser.add_argument("--val_steps", type=int, default=1000)
+    parser.add_argument("--eval_steps", type=int, default=2**10)
     parser.add_argument("--batch_size", type=int, default=256)
     parser.add_argument("--val_size", type=int, default=None)
     parser.add_argument("--num_workers", type=int, default=0)
@@ -353,7 +360,6 @@ def main() -> None:
         args.clamp_range = (clamp_min, clamp_max)
 
         loader_dict, entity_table = build_loader_dict(args, data, task, rank, world_size)
-        args.val_steps = min(args.val_steps, len(loader_dict["train"]))
         rank_print("Entity table: ", entity_table)
 
         barrier()
@@ -465,7 +471,15 @@ def main() -> None:
                         if args.num_demo > 0:
                             demo_batch = next(iter(loader_dict["train"])).to(device)
                             demo = model_for_io.get_demo_info(demo_batch, task.entity_table)
-                        val_pred = test(loader_dict["val"], model, task, args, device, demo)
+                        val_pred = test(
+                            loader_dict["val"],
+                            model,
+                            task,
+                            args,
+                            device,
+                            demo,
+                            max_steps=args.eval_steps,
+                        )
                         val_metrics = task.evaluate(val_pred, task.get_table("val"))
                         if run is not None:
                             for k, v in val_metrics.items():
@@ -478,7 +492,15 @@ def main() -> None:
                         )
                         if improved:
                             best_val_metric = val_metrics[tune_metric]
-                            test_pred = test(loader_dict["test"], model, task, args, device, demo)
+                            test_pred = test(
+                                loader_dict["test"],
+                                model,
+                                task,
+                                args,
+                                device,
+                                demo,
+                                max_steps=args.eval_steps,
+                            )
                             test_metrics = task.evaluate(test_pred)
                             best_test_metric = test_metrics[tune_metric]
                             if run is not None:
@@ -510,7 +532,9 @@ def main() -> None:
             model_for_io.load_state_dict(state_dict)
 
         best_val_metric = -math.inf if higher_is_better else math.inf
-        for epoch in range(1, args.epochs + 1):
+        epoch = 0
+        while steps < args.train_steps:
+            epoch += 1
             loss_accum = count_accum = 0
             tq = tqdm(loader_dict["train"], total=len(loader_dict["train"]), disable=not is_main_process())
             for batch in tq:
@@ -542,9 +566,23 @@ def main() -> None:
                 tq.set_description(f"[Train] Epoch/Step: {epoch:02d}/{steps} | Train loss: {train_loss:3f}")
 
                 if steps % args.val_steps == 0:
-                    val_pred = test(loader_dict["val"], model, task, args, device)
+                    val_pred = test(
+                        loader_dict["val"],
+                        model,
+                        task,
+                        args,
+                        device,
+                        max_steps=args.eval_steps,
+                    )
                     val_metrics = task.evaluate(val_pred, task.get_table("val"))
-                    test_pred = test(loader_dict["test"], model, task, args, device)
+                    test_pred = test(
+                        loader_dict["test"],
+                        model,
+                        task,
+                        args,
+                        device,
+                        max_steps=args.eval_steps,
+                    )
                     test_metrics = task.evaluate(test_pred)
                     if run is not None:
                         for k, v in val_metrics.items():
@@ -567,14 +605,30 @@ def main() -> None:
                         f"Best val: {best_val_metric:.4f}"
                     )
                     barrier()
+                if steps >= args.train_steps:
+                    break
 
         if state_dict is None:
             state_dict = copy.deepcopy(model_for_io.state_dict())
         model_for_io.load_state_dict(state_dict)
 
-        val_pred = test(loader_dict["val"], model, task, args, device)
+        val_pred = test(
+            loader_dict["val"],
+            model,
+            task,
+            args,
+            device,
+            max_steps=args.eval_steps,
+        )
         val_metrics = task.evaluate(val_pred, task.get_table("val"))
-        test_pred = test(loader_dict["test"], model, task, args, device)
+        test_pred = test(
+            loader_dict["test"],
+            model,
+            task,
+            args,
+            device,
+            max_steps=args.eval_steps,
+        )
         test_metrics = task.evaluate(test_pred)
         rank_print(f"Best Val metrics: {val_metrics}")
         rank_print(f"Best test metrics: {test_metrics}")

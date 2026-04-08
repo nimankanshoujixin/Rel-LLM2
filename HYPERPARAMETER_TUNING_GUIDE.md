@@ -36,10 +36,11 @@
 | `num_demo` | `0` | int | few-shot demo 数量 | 是 |
 | `max_new_tokens` | `1` | int | 推理时最多生成 token 数 | 否，分类任务一般固定 |
 | `loss_class_weight` | `None` | list[float] | 类别权重，二分类时影响 focal/损失加权 | 是 |
-| `epochs` | `100` | int | 微调轮数 | 否，通常作为预算固定 |
+| `train_steps` | `32768` | int | 微调总训练 step 数 | 否，通常作为预算固定 |
 | `pretrain` | `False` | flag | 是否先做预训练 | 是，但建议实验级切换 |
 | `pretrain_epochs` | `200` | int | 预训练轮数 | 否，通常作为预算固定 |
 | `val_steps` | `1000` | int | 每多少 step 做一次验证 | 是，但一般只小范围调 |
+| `eval_steps` | `1024` | int | 每次验证最多跑多少个 batch step | 否，通常作为预算固定 |
 | `batch_size` | `256` | int | 训练 batch size | 是 |
 | `val_size` | `None` | int/None | 验证/测试 batch size | 否，一般按显存上限设置 |
 | `num_workers` | `0` | int | DataLoader worker 数 | 否，偏工程参数 |
@@ -174,7 +175,7 @@
 | `dataset`, `task` | 实验定义，不是超参数 |
 | `cache_dir`, `text_embedder_path` | 工程路径参数 |
 | `debug` | 调试开关 |
-| `epochs`, `pretrain_epochs` | 更像预算，不是模型行为参数 |
+| `train_steps`, `pretrain_epochs`, `eval_steps` | 更像预算，不是模型行为参数 |
 | `val_size`, `num_workers` | 工程性能参数 |
 | `seed` | 需要固定，避免试验噪声 |
 | `max_new_tokens` | 二分类一般固定为 `1` |
@@ -313,7 +314,7 @@
 
 配置建议：
 
-- `epochs=3~5`
+- `train_steps=2048~4096`
 - `batch_size` 按显存上限取小
 - `n_trials=20~50`
 - 用 `MedianPruner`
@@ -327,7 +328,7 @@
 
 配置建议：
 
-- `epochs=10~20`
+- `train_steps=8192~32768`
 - 缩小 `lr/wd/dropout` 范围
 - `n_trials=10~20`
 
@@ -385,8 +386,9 @@ python main.py \
   --lr=0.0003 \
   --wd=0.001 \
   --val_steps=500 \
+  --eval_steps=1024 \
   --loss_class_weight 1.0 1.5 \
-  --epochs=5
+  --train_steps=4096
 ```
 
 ---
@@ -438,14 +440,14 @@ loss_class_weight:
 
 ### 第一轮预算
 
-- `epochs=5`
+- `train_steps=4096`
 - `n_trials=30`
 
 ### 第二轮
 
 取第一轮前 5 名附近继续精调：
 
-- `epochs=15~20`
+- `train_steps=8192~32768`
 - `n_trials=10~15`
 
 ---
@@ -483,4 +485,3 @@ loss_class_weight:
 2. 用 Optuna 先粗搜
 3. 再围绕 top-k 结果精搜
 4. 最后再做 `output_mlp` / `llm_frozen` / `text_embedder` / `pretrain` 这类范式级比较
-
