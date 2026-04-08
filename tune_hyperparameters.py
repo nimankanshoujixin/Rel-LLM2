@@ -17,6 +17,7 @@ from utils import task_info
 
 EVAL_LINE_RE = re.compile(r"\[Eval\].*?\| Val: (\{.*?\})(?: \| |$)")
 BEST_VAL_RE = re.compile(r"Best Val metrics: (\{.*\})")
+BEST_TEST_RE = re.compile(r"Best test metrics: (\{.*\})")
 
 
 def parse_args() -> argparse.Namespace:
@@ -40,6 +41,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--train-steps", type=int, default=2**15)
     parser.add_argument("--val-steps", type=int, default=500)
     parser.add_argument("--eval-steps", type=int, default=1024)
+    parser.add_argument("--test-steps", type=int, default=4096)
     parser.add_argument("--val-size", type=int, default=1)
     parser.add_argument(
         "--batch-size-choices",
@@ -177,30 +179,12 @@ def safe_parse_metrics(line: str, regex: re.Pattern[str]) -> dict[str, float] | 
     return metrics
 
 
-def build_trial_command(args: argparse.Namespace, trial: optuna.Trial) -> tuple[list[str], dict[str, Any]]:
-    batch_size_choices = parse_int_choices(args.batch_size_choices)
-    channels_choices = parse_int_choices(args.channels_choices)
-    num_layers_choices = parse_int_choices(args.num_layers_choices)
-    num_neighbors_choices = parse_int_choices(args.num_neighbors_choices)
-    aggr_choices = parse_str_choices(args.aggr_choices)
-    temporal_choices = parse_str_choices(args.temporal_strategy_choices)
-
-    params = {
-        "lr": trial.suggest_float("lr", 1e-5, 3e-3, log=True),
-        "wd": trial.suggest_float("wd", 1e-6, 1e-2, log=True),
-        "dropout": trial.suggest_float("dropout", 0.0, 0.5),
-        "channels": trial.suggest_categorical("channels", channels_choices),
-        "num_layers": trial.suggest_categorical("num_layers", num_layers_choices),
-        "num_neighbors": trial.suggest_categorical("num_neighbors", num_neighbors_choices),
-        "aggr": trial.suggest_categorical("aggr", aggr_choices),
-        "temporal_strategy": trial.suggest_categorical(
-            "temporal_strategy",
-            temporal_choices,
-        ),
-        "batch_size": trial.suggest_categorical("batch_size", batch_size_choices),
-        "w_pos": trial.suggest_float("w_pos", 0.5, 3.0),
-    }
-
+def build_main_command(
+    args: argparse.Namespace,
+    params: dict[str, Any],
+    *,
+    skip_test: bool,
+) -> list[str]:
     main_command = [
         "main.py",
         f"--dataset={args.dataset}",
@@ -210,6 +194,7 @@ def build_trial_command(args: argparse.Namespace, trial: optuna.Trial) -> tuple[
         f"--train_steps={args.train_steps}",
         f"--val_steps={args.val_steps}",
         f"--eval_steps={args.eval_steps}",
+        f"--test_steps={args.test_steps}",
         f"--val_size={args.val_size}",
         f"--channels={params['channels']}",
         f"--num_layers={params['num_layers']}",
@@ -250,8 +235,36 @@ def build_trial_command(args: argparse.Namespace, trial: optuna.Trial) -> tuple[
         command.append("--pretrain")
     if args.debug:
         command.append("--debug")
+    if skip_test:
+        command.append("--skip_test")
 
-    return command, params
+    return command
+
+
+def build_trial_command(args: argparse.Namespace, trial: optuna.Trial) -> tuple[list[str], dict[str, Any]]:
+    batch_size_choices = parse_int_choices(args.batch_size_choices)
+    channels_choices = parse_int_choices(args.channels_choices)
+    num_layers_choices = parse_int_choices(args.num_layers_choices)
+    num_neighbors_choices = parse_int_choices(args.num_neighbors_choices)
+    aggr_choices = parse_str_choices(args.aggr_choices)
+    temporal_choices = parse_str_choices(args.temporal_strategy_choices)
+
+    params = {
+        "lr": trial.suggest_float("lr", 1e-5, 3e-3, log=True),
+        "wd": trial.suggest_float("wd", 1e-6, 1e-2, log=True),
+        "dropout": trial.suggest_float("dropout", 0.0, 0.5),
+        "channels": trial.suggest_categorical("channels", channels_choices),
+        "num_layers": trial.suggest_categorical("num_layers", num_layers_choices),
+        "num_neighbors": trial.suggest_categorical("num_neighbors", num_neighbors_choices),
+        "aggr": trial.suggest_categorical("aggr", aggr_choices),
+        "temporal_strategy": trial.suggest_categorical(
+            "temporal_strategy",
+            temporal_choices,
+        ),
+        "batch_size": trial.suggest_categorical("batch_size", batch_size_choices),
+        "w_pos": trial.suggest_float("w_pos", 0.5, 3.0),
+    }
+    return build_main_command(args, params, skip_test=True), params
 
 
 def get_tuning_target(dataset_name: str, task_name: str) -> tuple[str, bool]:
@@ -354,7 +367,69 @@ def objective_factory(
     return objective
 
 
-def save_best_result(study: optuna.Study, output_dir: Path) -> None:
+def run_final_test(
+    args: argparse.Namespace,
+    study: optuna.Study,
+    output_dir: Path,
+) -> dict[str, Any]:
+    best_params = study.best_trial.params
+    command = build_main_command(args, best_params, skip_test=False)
+    log_path = output_dir / "best_trial_test.log"
+    env = os.environ.copy()
+    env["PYTHONUNBUFFERED"] = "1"
+    if args.gpu_id is not None:
+        env["CUDA_VISIBLE_DEVICES"] = args.gpu_id
+    env["NCCL_P2P_DISABLE"] = args.nccl_p2p_disable
+
+    all_output: list[str] = []
+    with log_path.open("w", encoding="utf-8") as log_file:
+        proc = subprocess.Popen(
+            command,
+            cwd=args.workdir,
+            env=env,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            bufsize=1,
+        )
+        try:
+            assert proc.stdout is not None
+            for line in proc.stdout:
+                sys.stdout.write(line)
+                log_file.write(line)
+                log_file.flush()
+                all_output.append(line)
+            return_code = proc.wait()
+        finally:
+            if proc.poll() is None:
+                terminate_process(proc)
+
+    if return_code != 0:
+        raise RuntimeError(f"Best-trial final test failed with exit code {return_code}.")
+
+    best_val_metrics = None
+    best_test_metrics = None
+    for line in reversed(all_output):
+        if best_test_metrics is None:
+            best_test_metrics = safe_parse_metrics(line, BEST_TEST_RE)
+        if best_val_metrics is None:
+            best_val_metrics = safe_parse_metrics(line, BEST_VAL_RE)
+        if best_val_metrics is not None and best_test_metrics is not None:
+            break
+
+    return {
+        "command": " ".join(command),
+        "log_path": str(log_path),
+        "best_val_metrics": best_val_metrics,
+        "best_test_metrics": best_test_metrics,
+    }
+
+
+def save_best_result(
+    study: optuna.Study,
+    output_dir: Path,
+    final_test_result: dict[str, Any] | None = None,
+) -> None:
     best = {
         "study_name": study.study_name,
         "best_trial": study.best_trial.number,
@@ -362,6 +437,8 @@ def save_best_result(study: optuna.Study, output_dir: Path) -> None:
         "best_params": study.best_params,
         "best_user_attrs": study.best_trial.user_attrs,
     }
+    if final_test_result is not None:
+        best["final_test"] = final_test_result
     with (output_dir / "best_trial.json").open("w", encoding="utf-8") as f:
         json.dump(best, f, indent=2, ensure_ascii=False)
 
@@ -396,7 +473,8 @@ def main() -> None:
         trial_dir=output_dir,
     )
     study.optimize(objective, n_trials=args.n_trials, timeout=args.timeout)
-    save_best_result(study, output_dir)
+    final_test_result = run_final_test(args, study, output_dir)
+    save_best_result(study, output_dir, final_test_result)
 
     print(f"Study: {study.study_name}")
     print(f"Direction: {direction}")

@@ -41,6 +41,7 @@
 | `pretrain_epochs` | `200` | int | 预训练轮数 | 否，通常作为预算固定 |
 | `val_steps` | `1000` | int | 每多少 step 做一次验证 | 是，但一般只小范围调 |
 | `eval_steps` | `1024` | int | 每次验证最多跑多少个 batch step | 否，通常作为预算固定 |
+| `test_steps` | `4096` | int | 最终测试最多跑多少个 batch step | 否，通常作为预算固定 |
 | `batch_size` | `256` | int | 训练 batch size | 是 |
 | `val_size` | `None` | int/None | 验证/测试 batch size | 否，一般按显存上限设置 |
 | `num_workers` | `0` | int | DataLoader worker 数 | 否，偏工程参数 |
@@ -175,7 +176,7 @@
 | `dataset`, `task` | 实验定义，不是超参数 |
 | `cache_dir`, `text_embedder_path` | 工程路径参数 |
 | `debug` | 调试开关 |
-| `train_steps`, `pretrain_epochs`, `eval_steps` | 更像预算，不是模型行为参数 |
+| `train_steps`, `pretrain_epochs`, `eval_steps`, `test_steps` | 更像预算，不是模型行为参数 |
 | `val_size`, `num_workers` | 工程性能参数 |
 | `seed` | 需要固定，避免试验噪声 |
 | `max_new_tokens` | 二分类一般固定为 `1` |

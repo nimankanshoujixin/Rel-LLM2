@@ -142,6 +142,7 @@ Mapping:
 - `--pretrain_epochs`
 - `--val_steps`
 - `--eval_steps`
+- `--test_steps`
 - `--batch_size`
 - `--val_size`
 - `--num_workers`
@@ -155,7 +156,8 @@ Important:
 - Treat the `argparse` definitions in `main.py` as the source of truth.
 - `--train_steps` is the finetuning budget and replaces the old epoch-based budget.
 - `--val_steps` controls how often validation runs during training.
-- `--eval_steps` caps how many loader batches are consumed per validation/test pass.
+- `--eval_steps` caps how many loader batches are consumed per intermediate validation pass.
+- `--test_steps` caps how many loader batches are consumed by the final test pass.
 
 ---
 
@@ -360,6 +362,8 @@ The tuning script will:
 - sample hyperparameters
 - launch `main.py`
 - parse validation metrics
+- skip the test split during trial search
+- rerun the best trial once and record its final test metrics
 - store trial logs under `optuna_runs/<study_name>/`
 - write the best result to `best_trial.json`
 

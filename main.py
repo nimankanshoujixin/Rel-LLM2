@@ -5,9 +5,10 @@ import math
 import os
 import warnings
 from pathlib import Path
-from typing import Dict
+from typing import Any, Dict
 
 import numpy as np
+import pooch
 import torch
 import torch.distributed as dist
 import wandb
@@ -112,6 +113,37 @@ def graph_cache_ready(db, cache_dir: Path) -> bool:
     if not cache_dir.exists():
         return False
     return all((cache_dir / f"{table_name}.pt").exists() for table_name in db.table_dict)
+
+
+def relbench_db_cache_ready(dataset_name: str) -> bool:
+    db_path = Path(pooch.os_cache("relbench")) / dataset_name / "db"
+    return db_path.exists() and any(db_path.iterdir())
+
+
+def relbench_task_cache_ready(dataset_name: str, task_name: str) -> bool:
+    task_path = Path(pooch.os_cache("relbench")) / dataset_name / "tasks" / task_name
+    return task_path.exists() and all((task_path / f"{split}.parquet").exists() for split in ("train", "val", "test"))
+
+
+def relbench_artifacts_ready(dataset_name: str, task_name: str) -> bool:
+    return relbench_db_cache_ready(dataset_name) and relbench_task_cache_ready(dataset_name, task_name)
+
+
+def load_dataset_task_and_db(
+    args: argparse.Namespace,
+    rank: int,
+) -> tuple[Dataset, Any, Any]:
+    if is_distributed() and not relbench_artifacts_ready(args.dataset, args.task):
+        if rank == 0:
+            get_dataset(args.dataset, download=True)
+            get_task(args.dataset, args.task, download=True)
+        barrier()
+
+    dataset: Dataset = get_dataset(args.dataset, download=False)
+    db = dataset.get_db()
+    task = get_task(args.dataset, args.task, download=False)
+    task.name = args.task
+    return dataset, db, task
 
 
 def build_text_embedder_cfg(
@@ -337,6 +369,10 @@ def evaluate_loader(
     return {fn.__name__: fn(target, pred) for fn in task.metrics}
 
 
+def resolve_max_steps(max_steps: int) -> int | None:
+    return None if max_steps <= 0 else max_steps
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--dataset", type=str, default="rel-stack")
@@ -379,6 +415,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--pretrain_epochs", type=int, default=200)
     parser.add_argument("--val_steps", type=int, default=1000)
     parser.add_argument("--eval_steps", type=int, default=2**10)
+    parser.add_argument("--test_steps", type=int, default=2**12)
+    parser.add_argument("--skip_test", action="store_true")
     parser.add_argument("--batch_size", type=int, default=256)
     parser.add_argument("--val_size", type=int, default=None)
     parser.add_argument("--num_workers", type=int, default=0)
@@ -397,30 +435,46 @@ def main() -> None:
         if torch.cuda.is_available():
             torch.set_num_threads(1)
 
-        if is_distributed() and rank != 0:
-            barrier()
-
-        dataset: Dataset = get_dataset(args.dataset, download=(not is_distributed()) or rank == 0)
-        db = dataset.get_db()
-        task = get_task(args.dataset, args.task, download=(not is_distributed()) or rank == 0)
-        task.name = args.task
+        dataset, db, task = load_dataset_task_and_db(args, rank)
 
         stypes_cache_path = Path(f"{args.cache_dir}/{args.dataset}/stypes.json")
-        col_to_stype_dict = load_or_create_stypes(db, stypes_cache_path, rank)
-
         materialized_cache_dir = Path(f"{args.cache_dir}/{args.dataset}/materialized")
-        text_embedder_cfg = build_text_embedder_cfg(args, db, materialized_cache_dir, device)
-        data, col_stats_dict = make_pkey_fkey_graph(
-            db,
-            col_to_stype_dict=col_to_stype_dict,
-            text_embedder_cfg=text_embedder_cfg,
-            cache_dir=str(materialized_cache_dir),
-        )
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
-
-        if is_distributed() and rank == 0:
+        graph_artifacts_ready = stypes_cache_path.exists() and graph_cache_ready(db, materialized_cache_dir)
+        if is_distributed() and not graph_artifacts_ready:
+            if rank == 0:
+                col_to_stype_dict = load_or_create_stypes(db, stypes_cache_path, rank)
+                text_embedder_cfg = build_text_embedder_cfg(args, db, materialized_cache_dir, device)
+                data, col_stats_dict = make_pkey_fkey_graph(
+                    db,
+                    col_to_stype_dict=col_to_stype_dict,
+                    text_embedder_cfg=text_embedder_cfg,
+                    cache_dir=str(materialized_cache_dir),
+                )
+                if torch.cuda.is_available():
+                    torch.cuda.empty_cache()
             barrier()
+            if rank != 0:
+                col_to_stype_dict = load_or_create_stypes(db, stypes_cache_path, rank)
+                text_embedder_cfg = build_text_embedder_cfg(args, db, materialized_cache_dir, device)
+                data, col_stats_dict = make_pkey_fkey_graph(
+                    db,
+                    col_to_stype_dict=col_to_stype_dict,
+                    text_embedder_cfg=text_embedder_cfg,
+                    cache_dir=str(materialized_cache_dir),
+                )
+                if torch.cuda.is_available():
+                    torch.cuda.empty_cache()
+        else:
+            col_to_stype_dict = load_or_create_stypes(db, stypes_cache_path, rank)
+            text_embedder_cfg = build_text_embedder_cfg(args, db, materialized_cache_dir, device)
+            data, col_stats_dict = make_pkey_fkey_graph(
+                db,
+                col_to_stype_dict=col_to_stype_dict,
+                text_embedder_cfg=text_embedder_cfg,
+                cache_dir=str(materialized_cache_dir),
+            )
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
 
         rank_print("Table names: ", list(db.table_dict.keys()))
         rank_print("Begin time: ", db.min_timestamp, "End time: ", db.max_timestamp)
@@ -506,7 +560,6 @@ def main() -> None:
                 )
             pretrain_steps = 0
             best_val_metric = -math.inf if higher_is_better else math.inf
-            best_test_metric = None
             for epoch in range(1, args.pretrain_epochs + 1):
                 loss_accum = count_accum = 0
                 tq = tqdm(loader_dict["train"], total=len(loader_dict["train"]), disable=not is_main_process())
@@ -548,7 +601,7 @@ def main() -> None:
                             args,
                             device,
                             demo,
-                            max_steps=args.eval_steps,
+                            max_steps=resolve_max_steps(args.eval_steps),
                             progress_desc="[Val]",
                         )
                         if run is not None:
@@ -562,27 +615,12 @@ def main() -> None:
                         )
                         if improved:
                             best_val_metric = val_metrics[tune_metric]
-                            test_metrics = evaluate_loader(
-                                loader_dict["test"],
-                                model,
-                                task,
-                                args,
-                                device,
-                                demo,
-                                max_steps=args.eval_steps,
-                                progress_desc="[Test]",
-                            )
-                            best_test_metric = test_metrics[tune_metric]
-                            if run is not None:
-                                for k, v in test_metrics.items():
-                                    run.log({f"test/{k}": v}, step=pretrain_steps)
                             state_dict = copy.deepcopy(model_for_io.state_dict())
                         scheduler.step(val_metrics[tune_metric])
                         rank_print(
                             f"[Eval] Epoch/Step: {epoch:02d}/{pretrain_steps} | "
                             f"Val: {val_metrics} | "
-                            f"Best val/test: {best_val_metric:.4f}/"
-                            f"{float('nan') if best_test_metric is None else best_test_metric:.4f}"
+                            f"Best val: {best_val_metric:.4f}"
                         )
                         barrier()
 
@@ -650,23 +688,12 @@ def main() -> None:
                         task,
                         args,
                         device,
-                        max_steps=args.eval_steps,
+                        max_steps=resolve_max_steps(args.eval_steps),
                         progress_desc="[Val]",
-                    )
-                    test_metrics = evaluate_loader(
-                        loader_dict["test"],
-                        model,
-                        task,
-                        args,
-                        device,
-                        max_steps=args.eval_steps,
-                        progress_desc="[Test]",
                     )
                     if run is not None:
                         for k, v in val_metrics.items():
                             run.log({f"val/{k}": v}, step=steps)
-                        for k, v in test_metrics.items():
-                            run.log({f"test/{k}": v}, step=steps)
 
                     improved = (
                         higher_is_better and val_metrics[tune_metric] >= best_val_metric
@@ -680,7 +707,7 @@ def main() -> None:
                     rank_print(
                         f"[Eval] Train step: {steps}/{args.train_steps} | "
                         f"Eval cap: {args.eval_steps} step(s) | "
-                        f"Val: {val_metrics} | Test: {test_metrics} | "
+                        f"Val: {val_metrics} | "
                         f"Best val: {best_val_metric:.4f}"
                     )
                     barrier()
@@ -697,20 +724,21 @@ def main() -> None:
             task,
             args,
             device,
-            max_steps=args.eval_steps,
+            max_steps=resolve_max_steps(args.eval_steps),
             progress_desc="[Val]",
         )
-        test_metrics = evaluate_loader(
-            loader_dict["test"],
-            model,
-            task,
-            args,
-            device,
-            max_steps=args.eval_steps,
-            progress_desc="[Test]",
-        )
         rank_print(f"Best Val metrics: {val_metrics}")
-        rank_print(f"Best test metrics: {test_metrics}")
+        if not args.skip_test:
+            test_metrics = evaluate_loader(
+                loader_dict["test"],
+                model,
+                task,
+                args,
+                device,
+                max_steps=resolve_max_steps(args.test_steps),
+                progress_desc="[Test]",
+            )
+            rank_print(f"Best test metrics: {test_metrics}")
         if run is not None:
             for k, v in test_metrics.items():
                 run.log({f"test/{k}": v}, step=steps + 1)

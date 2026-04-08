@@ -28,6 +28,7 @@ These are also fixed unless you override them manually:
 - `train_steps`
 - `val_steps`
 - `eval_steps`
+- `test_steps`
 - `val_size`
 - `seed`
 - `dataset`
@@ -49,7 +50,13 @@ Semantics:
 
 - `train_steps` is the total finetuning budget passed to `main.py`
 - `val_steps` controls how often intermediate evaluation is triggered
-- `eval_steps` caps how many validation/test loader batches each evaluation pass consumes
+- `eval_steps` caps how many validation loader batches each intermediate evaluation consumes
+- `test_steps` caps how many test loader batches the final best-trial test consumes
+
+During tuning:
+
+- intermediate trial runs do not execute the test split
+- the test split is run only once, after the best trial is selected
 
 ---
 
@@ -76,6 +83,7 @@ Other useful arguments:
 - `--timeout`
 - `--val-steps`
 - `--eval-steps`
+- `--test-steps`
 - `--val-size`
 - `--cache-dir`
 - `--text-embedder-path`
@@ -180,7 +188,9 @@ python tune_hyperparameters.py \
   --gpu-id 6 \
   --n-trials 30 \
   --train-steps 4096 \
-  --eval-steps 1024 \
+  --val-steps 512 \
+  --eval-steps 128 \
+  --test-steps 1024 \
   --study-name amazon_user_churn_llama1b
 ```
 
@@ -196,7 +206,9 @@ python tune_hyperparameters.py \
   --nccl-p2p-disable 1 \
   --n-trials 30 \
   --train-steps 4096 \
-  --eval-steps 1024 \
+  --val-steps 512 \
+  --eval-steps 128 \
+  --test-steps 1024 \
   --study-name amazon_user_churn_llama1b_ddp
 ```
 
@@ -222,6 +234,9 @@ The script writes:
 
 - per-trial logs:
   - `optuna_runs/<study_name>/trial_XXXX.log`
+
+- final best-trial test log:
+  - `optuna_runs/<study_name>/best_trial_test.log`
 
 - best trial summary:
   - `optuna_runs/<study_name>/best_trial.json`
