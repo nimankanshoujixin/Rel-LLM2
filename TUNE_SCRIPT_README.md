@@ -29,6 +29,9 @@ These are also fixed unless you override them manually:
 - `val_steps`
 - `eval_steps`
 - `test_steps`
+- `early_stop_patience`
+- `early_stop_metric_delta`
+- `early_stop_loss_delta`
 - `val_size`
 - `seed`
 - `dataset`
@@ -52,6 +55,7 @@ Semantics:
 - `val_steps` controls how often intermediate evaluation is triggered
 - `eval_steps` caps how many validation loader batches each intermediate evaluation consumes
 - `test_steps` caps how many test loader batches the final best-trial test consumes
+- early stopping triggers only when validation metric and windowed training loss both stop improving
 
 During tuning:
 
@@ -87,6 +91,9 @@ Other useful arguments:
 - `--val-steps`
 - `--eval-steps`
 - `--test-steps`
+- `--early-stop-patience`
+- `--early-stop-metric-delta`
+- `--early-stop-loss-delta`
 - `--val-size`
 - `--cache-dir`
 - `--text-embedder-path`

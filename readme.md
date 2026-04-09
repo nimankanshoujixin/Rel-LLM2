@@ -143,6 +143,9 @@ Mapping:
 - `--val_steps`
 - `--eval_steps`
 - `--test_steps`
+- `--early_stop_patience`
+- `--early_stop_metric_delta`
+- `--early_stop_loss_delta`
 - `--batch_size`
 - `--val_size`
 - `--num_workers`
@@ -158,6 +161,7 @@ Important:
 - `--val_steps` controls how often validation runs during training.
 - `--eval_steps` caps how many loader batches are consumed per intermediate validation pass.
 - `--test_steps` caps how many loader batches are consumed by the final test pass.
+- early stopping is optional and uses both validation metric plateau and windowed training-loss plateau.
 
 ---
 

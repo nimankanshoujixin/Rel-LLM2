@@ -42,6 +42,9 @@
 | `val_steps` | `1000` | int | 每多少 step 做一次验证 | 是，但一般只小范围调 |
 | `eval_steps` | `1024` | int | 每次验证最多跑多少个 batch step | 否，通常作为预算固定 |
 | `test_steps` | `4096` | int | 最终测试最多跑多少个 batch step | 否，通常作为预算固定 |
+| `early_stop_patience` | `0` | int | 连续多少次验证 metric 和 loss 都无明显改善后早停，0 表示关闭 | 否，通常作为训练策略固定 |
+| `early_stop_metric_delta` | `0.0` | float | 验证指标最小改善阈值 | 否，通常作为训练策略固定 |
+| `early_stop_loss_delta` | `0.0` | float | 窗口训练 loss 最小下降阈值 | 否，通常作为训练策略固定 |
 | `batch_size` | `256` | int | 训练 batch size | 是 |
 | `val_size` | `None` | int/None | 验证/测试 batch size | 否，一般按显存上限设置 |
 | `num_workers` | `0` | int | DataLoader worker 数 | 否，偏工程参数 |

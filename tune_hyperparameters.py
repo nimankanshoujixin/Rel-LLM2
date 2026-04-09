@@ -48,6 +48,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--val-steps", type=int, default=500)
     parser.add_argument("--eval-steps", type=int, default=1024)
     parser.add_argument("--test-steps", type=int, default=4096)
+    parser.add_argument("--early-stop-patience", type=int, default=0)
+    parser.add_argument("--early-stop-metric-delta", type=float, default=0.0)
+    parser.add_argument("--early-stop-loss-delta", type=float, default=0.0)
     parser.add_argument("--val-size", type=int, default=1)
     parser.add_argument(
         "--batch-size-choices",
@@ -218,6 +221,9 @@ def build_main_command(
         f"--val_steps={args.val_steps}",
         f"--eval_steps={args.eval_steps}",
         f"--test_steps={args.test_steps}",
+        f"--early_stop_patience={args.early_stop_patience}",
+        f"--early_stop_metric_delta={args.early_stop_metric_delta}",
+        f"--early_stop_loss_delta={args.early_stop_loss_delta}",
         f"--val_size={args.val_size}",
         f"--channels={params['channels']}",
         f"--num_layers={params['num_layers']}",

@@ -258,6 +258,29 @@ def gather_predictions(local_pred: np.ndarray) -> np.ndarray:
     return np.concatenate(non_empty, axis=0)
 
 
+def reduce_loss_stats(loss_accum: float, count_accum: int, device: torch.device) -> float:
+    stats = torch.tensor([loss_accum, float(count_accum)], device=device, dtype=torch.float64)
+    if is_distributed():
+        dist.all_reduce(stats, op=dist.ReduceOp.SUM)
+    total_loss_accum, total_count = stats.tolist()
+    return total_loss_accum / max(total_count, 1.0)
+
+
+def metric_improved(
+    current: float,
+    best: float,
+    higher_is_better: bool,
+    min_delta: float,
+) -> bool:
+    if higher_is_better:
+        return current > best + min_delta
+    return current < best - min_delta
+
+
+def loss_improved(current: float, best: float, min_delta: float) -> bool:
+    return current < best - min_delta
+
+
 @torch.no_grad()
 def run_inference(
     loader: NeighborLoader,
@@ -417,6 +440,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--eval_steps", type=int, default=2**10)
     parser.add_argument("--test_steps", type=int, default=2**12)
     parser.add_argument("--skip_test", action="store_true")
+    parser.add_argument("--early_stop_patience", type=int, default=0)
+    parser.add_argument("--early_stop_metric_delta", type=float, default=0.0)
+    parser.add_argument("--early_stop_loss_delta", type=float, default=0.0)
     parser.add_argument("--batch_size", type=int, default=256)
     parser.add_argument("--val_size", type=int, default=None)
     parser.add_argument("--num_workers", type=int, default=0)
@@ -640,6 +666,11 @@ def main() -> None:
             model_for_io.load_state_dict(state_dict)
 
         best_val_metric = -math.inf if higher_is_better else math.inf
+        best_window_train_loss = math.inf
+        early_stop_counter = 0
+        interval_loss_accum = 0.0
+        interval_count_accum = 0
+        stop_training = False
         while steps < args.train_steps:
             loss_accum = count_accum = 0
             remaining_steps = args.train_steps - steps
@@ -669,6 +700,8 @@ def main() -> None:
                 steps += 1
                 loss_accum += loss.detach().item() * nums_samples
                 count_accum += nums_samples
+                interval_loss_accum += loss.detach().item() * nums_samples
+                interval_count_accum += nums_samples
                 train_loss = loss_accum / max(count_accum, 1)
                 summary = {"loss": train_loss, "lr": optimizer.param_groups[-1]["lr"]}
                 if run is not None:
@@ -682,6 +715,7 @@ def main() -> None:
                 )
 
                 if steps % args.val_steps == 0:
+                    window_train_loss = reduce_loss_stats(interval_loss_accum, interval_count_accum, device)
                     val_metrics = evaluate_loader(
                         loader_dict["val"],
                         model,
@@ -694,30 +728,62 @@ def main() -> None:
                     if run is not None:
                         for k, v in val_metrics.items():
                             run.log({f"val/{k}": v}, step=steps)
+                        run.log({"train/window_loss": window_train_loss}, step=steps)
 
-                    improved = (
-                        higher_is_better and val_metrics[tune_metric] >= best_val_metric
-                    ) or (
-                        not higher_is_better and val_metrics[tune_metric] <= best_val_metric
+                    metric_has_improved = metric_improved(
+                        val_metrics[tune_metric],
+                        best_val_metric,
+                        higher_is_better,
+                        args.early_stop_metric_delta,
                     )
-                    if improved:
+                    loss_has_improved = loss_improved(
+                        window_train_loss,
+                        best_window_train_loss,
+                        args.early_stop_loss_delta,
+                    )
+                    if metric_has_improved:
                         best_val_metric = val_metrics[tune_metric]
                         state_dict = copy.deepcopy(model_for_io.state_dict())
+                    if loss_has_improved:
+                        best_window_train_loss = window_train_loss
+                    if args.early_stop_patience > 0:
+                        if metric_has_improved or loss_has_improved:
+                            early_stop_counter = 0
+                        else:
+                            early_stop_counter += 1
+                    early_stop_status = (
+                        "disabled"
+                        if args.early_stop_patience <= 0
+                        else f"{early_stop_counter}/{args.early_stop_patience}"
+                    )
                     scheduler.step(val_metrics[tune_metric])
                     rank_print(
                         f"[Eval] Train step: {steps}/{args.train_steps} | "
                         f"Eval cap: {args.eval_steps} step(s) | "
+                        f"Window train loss: {window_train_loss:.6f} | "
                         f"Val: {val_metrics} | "
-                        f"Best val: {best_val_metric:.4f}"
+                        f"Best val: {best_val_metric:.4f} | "
+                        f"Early stop counter: {early_stop_status}"
                     )
+                    if args.early_stop_patience > 0 and early_stop_counter >= args.early_stop_patience:
+                        stop_training = True
+                        rank_print(
+                            f"Early stopping at train step {steps}: "
+                            "validation metric and training loss both plateaued."
+                        )
+                    interval_loss_accum = 0.0
+                    interval_count_accum = 0
                     barrier()
-                if steps >= args.train_steps:
+                if steps >= args.train_steps or stop_training:
                     break
+            if stop_training:
+                break
 
         if state_dict is None:
             state_dict = copy.deepcopy(model_for_io.state_dict())
         model_for_io.load_state_dict(state_dict)
 
+        test_metrics = None
         val_metrics = evaluate_loader(
             loader_dict["val"],
             model,
@@ -740,8 +806,9 @@ def main() -> None:
             )
             rank_print(f"Best test metrics: {test_metrics}")
         if run is not None:
-            for k, v in test_metrics.items():
-                run.log({f"test/{k}": v}, step=steps + 1)
+            if test_metrics is not None:
+                for k, v in test_metrics.items():
+                    run.log({f"test/{k}": v}, step=steps + 1)
             run.finish()
 
         barrier()
