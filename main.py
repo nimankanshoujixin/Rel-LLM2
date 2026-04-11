@@ -41,6 +41,19 @@ warnings.simplefilter(action="ignore", category=FutureWarning)
 os.environ["CURL_CA_BUNDLE"] = ""  # huggingface connection issue
 os.environ.setdefault("NCCL_P2P_DISABLE", "1")
 
+AUTOCOMPLETE_TASK_GROUPS = {
+    "rel-salt": [
+        "item-plant",
+        "item-shippoint",
+        "item-incoterms",
+        "sales-office",
+        "sales-group",
+        "sales-payterms",
+        "sales-shipcond",
+        "sales-incoterms",
+    ],
+}
+
 
 def is_distributed() -> bool:
     return dist.is_available() and dist.is_initialized()
@@ -129,6 +142,43 @@ def relbench_artifacts_ready(dataset_name: str, task_name: str) -> bool:
     return relbench_db_cache_ready(dataset_name) and relbench_task_cache_ready(dataset_name, task_name)
 
 
+def cache_task_tables(task) -> None:
+    for split in ("train", "val", "test"):
+        task.get_table(split, mask_input_cols=False)
+
+
+def get_autocomplete_task_names(dataset_name: str) -> list[str]:
+    try:
+        from relbench.tasks import get_task_names  # type: ignore
+
+        return list(get_task_names(dataset_name))
+    except Exception:
+        return AUTOCOMPLETE_TASK_GROUPS.get(dataset_name, [])
+
+
+def mask_autocomplete_feature_columns(args: argparse.Namespace, db, task) -> None:
+    if not is_autocomplete_task(task):
+        return
+
+    masked_cols_by_table: dict[str, set[str]] = {}
+    for task_name in get_autocomplete_task_names(args.dataset):
+        autocomplete_task = get_task(args.dataset, task_name, download=False)
+        if not is_autocomplete_task(autocomplete_task):
+            continue
+        masked_cols_by_table.setdefault(autocomplete_task.entity_table, set()).add(
+            autocomplete_task.target_col
+        )
+
+    for table_name, cols_to_drop in masked_cols_by_table.items():
+        if table_name not in db.table_dict:
+            continue
+        table = db.table_dict[table_name]
+        drop_cols = [col for col in cols_to_drop if col in table.df.columns]
+        if not drop_cols:
+            continue
+        table.df = table.df.drop(columns=drop_cols)
+
+
 def load_dataset_task_and_db(
     args: argparse.Namespace,
     rank: int,
@@ -141,8 +191,10 @@ def load_dataset_task_and_db(
 
     task = get_task(args.dataset, args.task, download=False)
     task.name = args.task
+    cache_task_tables(task)
     dataset: Dataset = task.dataset
     db = dataset.get_db(upto_test_timestamp=not is_autocomplete_task(task))
+    mask_autocomplete_feature_columns(args, db, task)
     return dataset, db, task
 
 
@@ -464,8 +516,8 @@ def main() -> None:
         dataset, db, task = load_dataset_task_and_db(args, rank)
 
         autocomplete_task = is_autocomplete_task(task)
-        stypes_cache_name = "stypes_autocomplete.json" if autocomplete_task else "stypes.json"
-        materialized_cache_name = "materialized_autocomplete" if autocomplete_task else "materialized"
+        stypes_cache_name = "stypes_autocomplete_masked.json" if autocomplete_task else "stypes.json"
+        materialized_cache_name = "materialized_autocomplete_masked" if autocomplete_task else "materialized"
         stypes_cache_path = Path(f"{args.cache_dir}/{args.dataset}/{stypes_cache_name}")
         materialized_cache_dir = Path(f"{args.cache_dir}/{args.dataset}/{materialized_cache_name}")
         graph_artifacts_ready = stypes_cache_path.exists() and graph_cache_ready(db, materialized_cache_dir)
