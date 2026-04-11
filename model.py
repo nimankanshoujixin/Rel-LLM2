@@ -19,7 +19,7 @@ from relbench.base import TaskType
 from relbench.modeling.nn import HeteroEncoder, HeteroGraphSAGE, HeteroTemporalEncoder
 from torch_frame.utils.infer_stype import infer_series_stype
 from torch_frame import stype
-from utils import question_dict, description_dict, initialize_weights
+from utils import get_task_description, get_task_question, infer_class_labels, initialize_weights
 
 # llama model type: https://huggingface.co/meta-llama
 # encode special tokens for Llama 3.2: https://www.llama.com/docs/model-cards-and-prompt-formats/meta-llama-3/
@@ -48,6 +48,8 @@ class Model(torch.nn.Module):
         self.output_probs = output_probs
         self.gamma = gamma
         self.alpha = alpha
+        self.multiclass_label_text: list[str] = []
+        self.multiclass_candidate_token_ids: list[list[int]] = []
 
         # pretrain setup
         self.pretrain_mask_cell = pretrain_mask_cell
@@ -103,6 +105,15 @@ class Model(torch.nn.Module):
             # cached token embeddings
             self.bos_embeds = self.word_embedding(self.tokenizer(BOS, add_special_tokens=False, return_tensors='pt').input_ids[0].to(self.model_device))
             self.pad_embeds = self.word_embedding(torch.tensor(self.tokenizer.pad_token_id).to(self.model_device)).unsqueeze(0)
+            if self.task.task_type == TaskType.MULTICLASS_CLASSIFICATION:
+                class_labels = infer_class_labels(self.task)
+                if len(class_labels) != out_channels:
+                    class_labels = list(range(out_channels))
+                self.multiclass_label_text = [str(label) for label in class_labels]
+                self.multiclass_candidate_token_ids = [
+                    self.tokenizer(label, add_special_tokens=False).input_ids + self.eos_id_list
+                    for label in self.multiclass_label_text
+                ]
 
         self.reset_parameters()
 
@@ -258,10 +269,12 @@ class Model(torch.nn.Module):
     def label_tokenize(self, batch, entity_table):
         if self.task.task_type == TaskType.BINARY_CLASSIFICATION:
             label = ['Yes' if i else 'No' for i in batch[entity_table].y.bool().tolist()]  # convert 0/1 to true/false
-        elif self.task.task_type == TaskType.BINARY_CLASSIFICATION:
-            label = [str(i) for i in batch[entity_table].y.int().tolist()]  # int number
+        elif self.task.task_type == TaskType.MULTICLASS_CLASSIFICATION:
+            label = [str(i) for i in batch[entity_table].y.long().tolist()]
         elif self.task.task_type == TaskType.REGRESSION:
             label = [str(i) for i in batch[entity_table].y.float().tolist()]
+        else:
+            label = [str(i) for i in batch[entity_table].y.tolist()]
         labels = self.tokenizer(label, add_special_tokens=False)
         return labels
 
@@ -270,9 +283,55 @@ class Model(torch.nn.Module):
         assert self.num_demo <= demo_batch_size, 'Too large demo numbers!'
         x_dict = self.gnn(x_dict, demo_batch.edge_index_dict)
         demo_node_embeds = self.projector(x_dict[entity_table][:demo_batch_size])
-        demo_labels = self.label_tokenize(demo_batch, entity_table).input_ids
-        demo_labels = torch.tensor(demo_labels, device=self.device)
+        demo_label_ids = self.label_tokenize(demo_batch, entity_table).input_ids
+        if self.task.task_type == TaskType.BINARY_CLASSIFICATION:
+            demo_labels = torch.tensor(demo_label_ids, device=self.device)
+        else:
+            demo_labels = [torch.tensor(label_ids, device=self.device) for label_ids in demo_label_ids]
         return demo_node_embeds, demo_labels
+
+    def score_multiclass_candidates(self, inputs_embeds: Tensor, attention_mask: Tensor) -> Tensor:
+        batch_size = inputs_embeds.size(0)
+        scores = []
+        for candidate_token_ids in self.multiclass_candidate_token_ids:
+            candidate_ids = torch.tensor(candidate_token_ids, device=self.device, dtype=torch.long)
+            candidate_embeds = self.word_embedding(candidate_ids).unsqueeze(0).expand(batch_size, -1, -1)
+            candidate_mask = torch.ones(
+                (batch_size, candidate_ids.numel()),
+                device=self.device,
+                dtype=attention_mask.dtype,
+            )
+            full_inputs = torch.cat([inputs_embeds, candidate_embeds], dim=1)
+            full_attention_mask = torch.cat([attention_mask, candidate_mask], dim=1)
+            labels = torch.full(
+                (batch_size, full_inputs.size(1)),
+                IGNORE_INDEX,
+                device=self.device,
+                dtype=torch.long,
+            )
+            labels[:, -candidate_ids.numel():] = candidate_ids.unsqueeze(0).expand(batch_size, -1)
+
+            with self.maybe_autocast():
+                outputs = self.model(
+                    inputs_embeds=full_inputs,
+                    attention_mask=full_attention_mask,
+                    return_dict=True,
+                )
+
+            logits = outputs.logits[..., :-1, :].contiguous()
+            shifted_labels = labels[..., 1:].contiguous()
+            valid_mask = shifted_labels != IGNORE_INDEX
+            safe_labels = shifted_labels.masked_fill(~valid_mask, 0)
+            log_probs = torch.nn.functional.log_softmax(logits.float(), dim=-1)
+            token_log_probs = log_probs.gather(
+                dim=-1,
+                index=safe_labels.unsqueeze(-1),
+            ).squeeze(-1)
+            token_log_probs = token_log_probs * valid_mask
+            token_counts = valid_mask.sum(dim=1).clamp_min(1)
+            scores.append(token_log_probs.sum(dim=1) / token_counts)
+
+        return torch.stack(scores, dim=1)
 
     def recursive_sample(self, batch_data: HeteroData, node_type: str, target_nodes: torch.Tensor, num_hops: int = 2):
         """
@@ -347,8 +406,17 @@ class Model(torch.nn.Module):
         node_embed = self.projector(node_embed)
 
         # encode description, questions and labels   # TODO: pad at last/in the middle? pad id to like 0006086 of the same length?
-        task_desc = description_dict[self.dataset][self.task.name]
-        question = ' Question: ' + question_dict[self.dataset][self.task.name] + ' Answer: '  # https://huggingface.co/docs/transformers/tasks/prompting
+        task_desc = get_task_description(self.dataset, self.task)
+        question = ' Question: ' + get_task_question(self.dataset, self.task)
+        if self.task.task_type == TaskType.MULTICLASS_CLASSIFICATION and self.multiclass_label_text:
+            if len(self.multiclass_label_text) <= 20:
+                question += ' Valid class ids: ' + ', '.join(self.multiclass_label_text) + '.'
+            else:
+                question += (
+                    f" Valid class ids range from {self.multiclass_label_text[0]} "
+                    f"to {self.multiclass_label_text[-1]}."
+                )
+        question += ' Answer: '  # https://huggingface.co/docs/transformers/tasks/prompting
         task_descs = self.tokenizer(task_desc, add_special_tokens=False)
         questions = self.tokenizer(question, add_special_tokens=False)
         if not inference and not self.output_mlp: labels = self.label_tokenize(batch, entity_table)
@@ -381,7 +449,13 @@ class Model(torch.nn.Module):
                 random_matrix = torch.rand(batch_size, len(demo_node_embeds), device=self.device)  # (B, B')
                 sampled_indices = random_matrix.argsort(dim=1)[:, :self.num_demo]  # (B, K)
             demo_node_embeds = demo_node_embeds[sampled_indices]  # (B, K, D)
-            demo_labels = demo_labels[sampled_indices]  # (B, K, 1)
+            if isinstance(demo_labels, torch.Tensor):
+                demo_labels = demo_labels[sampled_indices]
+            else:
+                demo_labels = [
+                    [demo_labels[idx.item()] for idx in row]
+                    for row in sampled_indices
+                ]
 
         # print(neighbors)
         # tokenizer happens on CPU
@@ -400,7 +474,8 @@ class Model(torch.nn.Module):
             if self.num_demo > 0 and demo_info is not None:
                 demo_embeds = []
                 for k in range(self.num_demo):
-                    demo_embeds += [demo_node_embeds[i][k].unsqueeze(0), self.word_embedding(demo_labels[i][k])]
+                    demo_label_ids = demo_labels[i][k]
+                    demo_embeds += [demo_node_embeds[i][k].unsqueeze(0), self.word_embedding(demo_label_ids)]
                 demo_embeds.append(node_embed[i].unsqueeze(0))  # append the seed entity at last
                 inputs_embeds = torch.cat([inputs_embeds[:-1], torch.cat(demo_embeds), inputs_embeds[-1:]])
             graph_prompt = node_embed[i].unsqueeze(0)
@@ -434,7 +509,9 @@ class Model(torch.nn.Module):
             with self.maybe_autocast():  # no need to call `generate() since we want hidden_states instead of new tokens`
                 outputs = self.model(inputs_embeds=inputs_embeds, attention_mask=attention_mask, return_dict=True, output_hidden_states=True)
             hidden = outputs.hidden_states[-1][..., -1, :]  # last hidden states
-            pred = self.lm_head(hidden).view(-1)
+            pred = self.lm_head(hidden)
+            if pred.dim() > 1 and pred.size(1) == 1:
+                pred = pred.view(-1)
             return pred
 
         if not inference:
@@ -472,10 +549,13 @@ class Model(torch.nn.Module):
         #########################
         # Inference
         #########################
-        with self.maybe_autocast():
-            outputs = self.model.generate(inputs_embeds=inputs_embeds, max_new_tokens=self.max_new_tokens, attention_mask=attention_mask, return_dict_in_generate=True,
-                                          output_scores=True, use_cache=True,  # https://discuss.huggingface.co/t/what-is-the-purpose-of-use-cache-in-decoder/958
-                                          pad_token_id=self.tokenizer.pad_token_id)  # suppress hf warning
+        if self.task.task_type == TaskType.MULTICLASS_CLASSIFICATION:
+            pred = self.score_multiclass_candidates(inputs_embeds, attention_mask)
+        else:
+            with self.maybe_autocast():
+                outputs = self.model.generate(inputs_embeds=inputs_embeds, max_new_tokens=self.max_new_tokens, attention_mask=attention_mask, return_dict_in_generate=True,
+                                              output_scores=True, use_cache=True,  # https://discuss.huggingface.co/t/what-is-the-purpose-of-use-cache-in-decoder/958
+                                              pad_token_id=self.tokenizer.pad_token_id)  # suppress hf warning
 
         if self.task.task_type == TaskType.BINARY_CLASSIFICATION:
             if self.output_probs:  # yes/no

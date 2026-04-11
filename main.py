@@ -691,7 +691,10 @@ def main() -> None:
                         if len(output_pred.size()) > 1 and output_pred.size(1) == 1
                         else output_pred
                     )
-                    loss = loss_fn(output_pred.float(), batch[entity_table].y.float())
+                    if task.task_type == TaskType.MULTICLASS_CLASSIFICATION:
+                        loss = loss_fn(output_pred.float(), batch[entity_table].y.long())
+                    else:
+                        loss = loss_fn(output_pred.float(), batch[entity_table].y.float())
                 else:
                     loss = model(batch, task.entity_table)
                 loss.backward()

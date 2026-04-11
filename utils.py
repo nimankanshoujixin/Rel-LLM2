@@ -1,5 +1,5 @@
 import numpy as np
-from torch.nn import BCEWithLogitsLoss, L1Loss
+from torch.nn import BCEWithLogitsLoss, CrossEntropyLoss, L1Loss
 import torch.nn as nn
 import torch.nn.init as init
 
@@ -52,6 +52,57 @@ question_dict = {'rel-event': {'user-attendance': 'What is the attendance of use
                                'study-adverse': 'What is the number of affected patients with severe adverse events/death for the trial in the next 1 year? Give an integer as an answer.',
                                'site-success': 'What is the success rate of a trial site in the next 1 year?'}}
 
+
+def get_task_description(dataset_name, task):
+    if dataset_name in description_dict and task.name in description_dict[dataset_name]:
+        return description_dict[dataset_name][task.name]
+
+    if task.task_type == TaskType.BINARY_CLASSIFICATION:
+        return f"This task is to predict the binary target '{task.target_col}' for each {task.entity_table} entity."
+    if task.task_type == TaskType.MULTICLASS_CLASSIFICATION:
+        return f"This task is to predict the categorical target '{task.target_col}' for each {task.entity_table} entity."
+    if task.task_type == TaskType.MULTILABEL_CLASSIFICATION:
+        return f"This task is to predict the multilabel target '{task.target_col}' for each {task.entity_table} entity."
+    if task.task_type == TaskType.REGRESSION:
+        return f"This task is to predict the numerical target '{task.target_col}' for each {task.entity_table} entity."
+    return f"This task is to predict the target '{getattr(task, 'target_col', 'label')}' for each entity."
+
+
+def get_task_question(dataset_name, task):
+    if dataset_name in question_dict and task.name in question_dict[dataset_name]:
+        return question_dict[dataset_name][task.name]
+
+    if task.task_type == TaskType.BINARY_CLASSIFICATION:
+        return f"Will the target '{task.target_col}' be positive? Give Yes or No as an answer."
+    if task.task_type == TaskType.MULTICLASS_CLASSIFICATION:
+        return f"What is the categorical value of '{task.target_col}'? Give the class id as an integer answer."
+    if task.task_type == TaskType.MULTILABEL_CLASSIFICATION:
+        return f"What labels apply to '{task.target_col}'? Provide the predicted labels."
+    if task.task_type == TaskType.REGRESSION:
+        return f"What is the value of '{task.target_col}'? Provide a numerical answer."
+    return f"What is the target value of '{getattr(task, 'target_col', 'label')}'?"
+
+
+def infer_num_classes(task):
+    if hasattr(task, "num_classes"):
+        return task.num_classes
+    train_table = task.get_table("train", mask_input_cols=False)
+    return int(train_table.df[task.target_col].nunique())
+
+
+def infer_class_labels(task):
+    if hasattr(task, "class_labels"):
+        return [int(label) for label in task.class_labels]
+
+    train_table = task.get_table("train", mask_input_cols=False)
+    labels = sorted({int(label) for label in train_table.df[task.target_col].dropna().tolist()})
+    if labels:
+        return labels
+
+    if hasattr(task, "num_classes"):
+        return list(range(int(task.num_classes)))
+    return list(range(infer_num_classes(task)))
+
 # TODO: check ratio of 1/0 in the dataset
 def task_info(task):
     clamp_min, clamp_max = None, None
@@ -73,6 +124,22 @@ def task_info(task):
         loss_fn = BCEWithLogitsLoss()
         tune_metric = "multilabel_auprc_macro"
         higher_is_better = True
+    elif task.task_type == TaskType.MULTICLASS_CLASSIFICATION:
+        out_channels = infer_num_classes(task)
+        loss_fn = CrossEntropyLoss()
+        metric_names = [fn.__name__ for fn in task.metrics]
+        if "macro_f1" in metric_names:
+            tune_metric = "macro_f1"
+        elif "micro_f1" in metric_names:
+            tune_metric = "micro_f1"
+        else:
+            tune_metric = metric_names[0]
+        higher_is_better = True
+    elif task.task_type == TaskType.LINK_PREDICTION:
+        raise NotImplementedError(
+            "This project currently supports only entity prediction tasks. "
+            "Link prediction / recommendation tasks need a separate training pipeline."
+        )
     else:
         raise ValueError(f"Task type {task.task_type} is unsupported")
     return out_channels, loss_fn, tune_metric, higher_is_better, clamp_min, clamp_max
