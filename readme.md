@@ -44,6 +44,7 @@ Recommended setup:
 ```bash
 conda env create -f environment.yml
 conda activate llm
+python -m pip install -U "relbench[full]==2.1.1"
 ```
 
 The environment file already includes the main dependencies used by this project:
@@ -58,6 +59,16 @@ The environment file already includes the main dependencies used by this project
 - `wandb`
 
 If this is a fresh machine, make sure the PyG-related packages match your CUDA and PyTorch versions.
+
+Note:
+
+- The repository keeps the old vendored RelBench snapshot under `relbench_v1_vendor/` only as a backup reference.
+- Runtime imports now resolve to the installed `relbench` package from the active environment.
+- You can verify this with:
+
+```bash
+python -c "import relbench, importlib.metadata; print(relbench.__file__); print(importlib.metadata.version('relbench'))"
+```
 
 ---
 
