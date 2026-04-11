@@ -63,11 +63,14 @@ If this is a fresh machine, make sure the PyG-related packages match your CUDA a
 Note:
 
 - The repository keeps the old vendored RelBench snapshot under `relbench_v1_vendor/` only as a backup reference.
+- The repository keeps the old vendored Torch Frame snapshot under `torch_frame_v1_vendor/` only as a backup reference.
 - Runtime imports now resolve to the installed `relbench` package from the active environment.
+- Runtime imports now resolve to the installed `torch_frame` package from the active environment.
 - You can verify this with:
 
 ```bash
 python -c "import relbench, importlib.metadata; print(relbench.__file__); print(importlib.metadata.version('relbench'))"
+python -c "import torch_frame; print(torch_frame.__file__); print(torch_frame.__version__)"
 ```
 
 ---
