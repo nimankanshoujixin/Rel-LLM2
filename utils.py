@@ -103,6 +103,15 @@ def infer_class_labels(task):
         return list(range(int(task.num_classes)))
     return list(range(infer_num_classes(task)))
 
+
+def is_autocomplete_task(task) -> bool:
+    metric_names = {fn.__name__ for fn in getattr(task, "metrics", [])}
+    return (
+        task.task_type == TaskType.MULTICLASS_CLASSIFICATION
+        and "mrr" in metric_names
+        and hasattr(task, "target_encoder")
+    )
+
 # TODO: check ratio of 1/0 in the dataset
 def task_info(task):
     clamp_min, clamp_max = None, None
@@ -128,7 +137,9 @@ def task_info(task):
         out_channels = infer_num_classes(task)
         loss_fn = CrossEntropyLoss()
         metric_names = [fn.__name__ for fn in task.metrics]
-        if "macro_f1" in metric_names:
+        if "mrr" in metric_names:
+            tune_metric = "mrr"
+        elif "macro_f1" in metric_names:
             tune_metric = "macro_f1"
         elif "micro_f1" in metric_names:
             tune_metric = "micro_f1"

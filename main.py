@@ -31,7 +31,7 @@ from relbench.tasks import get_task
 from text_embedder import TextEmbedding
 from torch_frame import stype
 from torch_frame.config.text_embedder import TextEmbedderConfig
-from utils import task_info
+from utils import is_autocomplete_task, task_info
 
 warnings.filterwarnings(
     "ignore",
@@ -139,10 +139,10 @@ def load_dataset_task_and_db(
             get_task(args.dataset, args.task, download=True)
         barrier()
 
-    dataset: Dataset = get_dataset(args.dataset, download=False)
-    db = dataset.get_db()
     task = get_task(args.dataset, args.task, download=False)
     task.name = args.task
+    dataset: Dataset = task.dataset
+    db = dataset.get_db(upto_test_timestamp=not is_autocomplete_task(task))
     return dataset, db, task
 
 
@@ -463,8 +463,11 @@ def main() -> None:
 
         dataset, db, task = load_dataset_task_and_db(args, rank)
 
-        stypes_cache_path = Path(f"{args.cache_dir}/{args.dataset}/stypes.json")
-        materialized_cache_dir = Path(f"{args.cache_dir}/{args.dataset}/materialized")
+        autocomplete_task = is_autocomplete_task(task)
+        stypes_cache_name = "stypes_autocomplete.json" if autocomplete_task else "stypes.json"
+        materialized_cache_name = "materialized_autocomplete" if autocomplete_task else "materialized"
+        stypes_cache_path = Path(f"{args.cache_dir}/{args.dataset}/{stypes_cache_name}")
+        materialized_cache_dir = Path(f"{args.cache_dir}/{args.dataset}/{materialized_cache_name}")
         graph_artifacts_ready = stypes_cache_path.exists() and graph_cache_ready(db, materialized_cache_dir)
         if is_distributed() and not graph_artifacts_ready:
             if rank == 0:
