@@ -292,44 +292,63 @@ class Model(torch.nn.Module):
 
     def score_multiclass_candidates(self, inputs_embeds: Tensor, attention_mask: Tensor) -> Tensor:
         batch_size = inputs_embeds.size(0)
-        scores = []
-        for candidate_token_ids in self.multiclass_candidate_token_ids:
-            candidate_ids = torch.tensor(candidate_token_ids, device=self.device, dtype=torch.long)
-            candidate_embeds = self.word_embedding(candidate_ids).unsqueeze(0).expand(batch_size, -1, -1)
-            candidate_mask = torch.ones(
-                (batch_size, candidate_ids.numel()),
-                device=self.device,
-                dtype=attention_mask.dtype,
+        with self.maybe_autocast():
+            prompt_outputs = self.model(
+                inputs_embeds=inputs_embeds,
+                attention_mask=attention_mask,
+                return_dict=True,
+                use_cache=True,
             )
-            full_inputs = torch.cat([inputs_embeds, candidate_embeds], dim=1)
-            full_attention_mask = torch.cat([attention_mask, candidate_mask], dim=1)
-            labels = torch.full(
-                (batch_size, full_inputs.size(1)),
-                IGNORE_INDEX,
+
+        prompt_log_probs = torch.nn.functional.log_softmax(
+            prompt_outputs.logits[:, -1, :].float(),
+            dim=-1,
+        )
+        prompt_past_key_values = prompt_outputs.past_key_values
+        scores = []
+
+        for candidate_token_ids in self.multiclass_candidate_token_ids:
+            candidate_ids = torch.tensor(
+                candidate_token_ids,
                 device=self.device,
                 dtype=torch.long,
             )
-            labels[:, -candidate_ids.numel():] = candidate_ids.unsqueeze(0).expand(batch_size, -1)
+            score = prompt_log_probs[:, candidate_ids[0]]
+            token_count = 1
 
-            with self.maybe_autocast():
-                outputs = self.model(
-                    inputs_embeds=full_inputs,
-                    attention_mask=full_attention_mask,
-                    return_dict=True,
-                )
+            if candidate_ids.numel() > 1:
+                past_key_values = prompt_past_key_values
+                current_attention_mask = attention_mask
+                for token_idx in range(candidate_ids.numel() - 1):
+                    current_token = candidate_ids[token_idx].view(1, 1).expand(batch_size, 1)
+                    current_attention_mask = torch.cat(
+                        [
+                            current_attention_mask,
+                            torch.ones(
+                                (batch_size, 1),
+                                device=self.device,
+                                dtype=attention_mask.dtype,
+                            ),
+                        ],
+                        dim=1,
+                    )
+                    with self.maybe_autocast():
+                        step_outputs = self.model(
+                            input_ids=current_token,
+                            attention_mask=current_attention_mask,
+                            past_key_values=past_key_values,
+                            return_dict=True,
+                            use_cache=True,
+                        )
+                    step_log_probs = torch.nn.functional.log_softmax(
+                        step_outputs.logits[:, -1, :].float(),
+                        dim=-1,
+                    )
+                    score = score + step_log_probs[:, candidate_ids[token_idx + 1]]
+                    past_key_values = step_outputs.past_key_values
+                    token_count += 1
 
-            logits = outputs.logits[..., :-1, :].contiguous()
-            shifted_labels = labels[..., 1:].contiguous()
-            valid_mask = shifted_labels != IGNORE_INDEX
-            safe_labels = shifted_labels.masked_fill(~valid_mask, 0)
-            log_probs = torch.nn.functional.log_softmax(logits.float(), dim=-1)
-            token_log_probs = log_probs.gather(
-                dim=-1,
-                index=safe_labels.unsqueeze(-1),
-            ).squeeze(-1)
-            token_log_probs = token_log_probs * valid_mask
-            token_counts = valid_mask.sum(dim=1).clamp_min(1)
-            scores.append(token_log_probs.sum(dim=1) / token_counts)
+            scores.append(score / token_count)
 
         return torch.stack(scores, dim=1)
 
