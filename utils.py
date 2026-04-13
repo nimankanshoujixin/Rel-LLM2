@@ -116,13 +116,16 @@ def get_label_texts(task):
         target_encoder = task.target_encoder
         if hasattr(target_encoder, "classes_"):
             raw_labels = list(target_encoder.classes_)
-        elif hasattr(target_encoder, "inverse_transform"):
-            raw_labels = list(target_encoder.inverse_transform(np.arange(infer_num_classes(task))))
-    elif hasattr(task, "class_labels"):
+    if raw_labels is None and hasattr(task, "class_labels"):
         raw_labels = list(task.class_labels)
 
     if raw_labels is None:
-        raw_labels = infer_class_labels(task)
+        train_table = task.get_table("train", mask_input_cols=False)
+        raw_values = train_table.df[task.target_col].dropna().tolist()
+        if raw_values:
+            raw_labels = sorted({str(label) for label in raw_values})
+        else:
+            raw_labels = [str(label) for label in infer_class_labels(task)]
 
     return [f"{task.target_col}: {label}" for label in raw_labels]
 
