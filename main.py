@@ -366,10 +366,12 @@ def run_inference(
             assert clamp_min is not None and clamp_max is not None
             pred = torch.clamp(pred, clamp_min, clamp_max)
 
-        if (args.model_type == "gnn" or args.output_mlp) and task.task_type in [
-            TaskType.BINARY_CLASSIFICATION,
-            TaskType.MULTILABEL_CLASSIFICATION,
-        ]:
+        if task.task_type == TaskType.BINARY_CLASSIFICATION:
+            if len(pred.size()) > 1 and pred.size(1) == 2:
+                pred = torch.softmax(pred, dim=-1)[..., 1]
+            elif args.model_type == "gnn" or args.output_mlp:
+                pred = torch.sigmoid(pred)
+        elif (args.model_type == "gnn" or args.output_mlp) and task.task_type == TaskType.MULTILABEL_CLASSIFICATION:
             pred = torch.sigmoid(pred)
 
         pred = pred.view(-1) if len(pred.size()) > 1 and pred.size(1) == 1 else pred
@@ -739,14 +741,16 @@ def main() -> None:
                 batch = batch.to(device)
                 nums_samples = batch[entity_table].y.size(0)
                 optimizer.zero_grad()
-                if args.model_type == "gnn" or args.output_mlp:
+                if args.model_type == "gnn" or model_for_io.uses_direct_supervision:
                     output_pred = model(batch, task.entity_table)
                     output_pred = (
                         output_pred.view(-1)
                         if len(output_pred.size()) > 1 and output_pred.size(1) == 1
                         else output_pred
                     )
-                    if task.task_type == TaskType.MULTICLASS_CLASSIFICATION:
+                    if task.task_type == TaskType.BINARY_CLASSIFICATION and len(output_pred.size()) > 1 and output_pred.size(1) == 2:
+                        loss = torch.nn.functional.cross_entropy(output_pred.float(), batch[entity_table].y.long())
+                    elif task.task_type == TaskType.MULTICLASS_CLASSIFICATION:
                         loss = loss_fn(output_pred.float(), batch[entity_table].y.long())
                     else:
                         loss = loss_fn(output_pred.float(), batch[entity_table].y.float())

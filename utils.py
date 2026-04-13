@@ -104,6 +104,29 @@ def infer_class_labels(task):
     return list(range(infer_num_classes(task)))
 
 
+def get_label_texts(task):
+    if task.task_type == TaskType.BINARY_CLASSIFICATION:
+        return ["No", "Yes"]
+
+    if task.task_type != TaskType.MULTICLASS_CLASSIFICATION:
+        raise ValueError(f"Label texts are only defined for classification tasks, got {task.task_type}.")
+
+    raw_labels = None
+    if hasattr(task, "target_encoder"):
+        target_encoder = task.target_encoder
+        if hasattr(target_encoder, "classes_"):
+            raw_labels = list(target_encoder.classes_)
+        elif hasattr(target_encoder, "inverse_transform"):
+            raw_labels = list(target_encoder.inverse_transform(np.arange(infer_num_classes(task))))
+    elif hasattr(task, "class_labels"):
+        raw_labels = list(task.class_labels)
+
+    if raw_labels is None:
+        raw_labels = infer_class_labels(task)
+
+    return [f"{task.target_col}: {label}" for label in raw_labels]
+
+
 def is_autocomplete_task(task) -> bool:
     metric_names = {fn.__name__ for fn in getattr(task, "metrics", [])}
     return (

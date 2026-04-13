@@ -5,6 +5,7 @@ import copy
 
 import torch
 import torch.distributed as dist
+import torch.nn.functional as F
 from torch import Tensor
 from torch.nn import Embedding, ModuleDict, Sigmoid, Sequential, Linear, Dropout
 
@@ -19,7 +20,7 @@ from relbench.base import TaskType
 from relbench.modeling.nn import HeteroEncoder, HeteroGraphSAGE, HeteroTemporalEncoder
 from torch_frame.utils.infer_stype import infer_series_stype
 from torch_frame import stype
-from utils import get_task_description, get_task_question, infer_class_labels, initialize_weights
+from utils import get_label_texts, get_task_description, get_task_question, infer_class_labels, initialize_weights
 
 # llama model type: https://huggingface.co/meta-llama
 # encode special tokens for Llama 3.2: https://www.llama.com/docs/model-cards-and-prompt-formats/meta-llama-3/
@@ -48,8 +49,17 @@ class Model(torch.nn.Module):
         self.output_probs = output_probs
         self.gamma = gamma
         self.alpha = alpha
+        self.uses_label_scorer = False
+        self.uses_regression_head = False
+        self.uses_direct_supervision = False
+        self.uses_generation_supervision = False
         self.multiclass_label_text: list[str] = []
         self.multiclass_candidate_token_ids: list[list[int]] = []
+        self.label_texts: list[str] = []
+        self.label_token_ids: list[list[int]] = []
+        self.sample_head = None
+        self.label_head = None
+        self.regression_head = None
 
         # pretrain setup
         self.pretrain_mask_cell = pretrain_mask_cell
@@ -101,6 +111,28 @@ class Model(torch.nn.Module):
             out_dim = self.word_embedding.embedding_dim
             self.projector = Sequential(Linear(channels, 1024), Sigmoid(), Dropout(dropout), Linear(1024, out_dim), Dropout(dropout)).to(self.model_device)
             self.lm_head = MLP(out_dim, out_channels=out_channels, norm=norm, num_layers=1, dropout=dropout) if self.output_mlp else None
+            self.uses_label_scorer = self.task.task_type in [
+                TaskType.BINARY_CLASSIFICATION,
+                TaskType.MULTICLASS_CLASSIFICATION,
+            ]
+            self.uses_regression_head = self.task.task_type == TaskType.REGRESSION
+            self.uses_direct_supervision = self.output_mlp or self.uses_label_scorer or self.uses_regression_head
+            self.uses_generation_supervision = not self.uses_direct_supervision
+            if self.uses_label_scorer:
+                self.label_texts = get_label_texts(self.task)
+                self.label_token_ids = [
+                    self.tokenizer(label, add_special_tokens=False).input_ids
+                    for label in self.label_texts
+                ]
+                self.sample_head = MLP(out_dim, out_channels=out_dim, norm=norm, num_layers=1, dropout=dropout).to(self.model_device)
+                self.label_head = MLP(out_dim, out_channels=out_dim, norm=norm, num_layers=1, dropout=dropout).to(self.model_device)
+            else:
+                self.sample_head = None
+                self.label_head = None
+            self.regression_head = (
+                MLP(out_dim, out_channels=1, norm=norm, num_layers=1, dropout=dropout).to(self.model_device)
+                if self.uses_regression_head else None
+            )
 
             # cached token embeddings
             self.bos_embeds = self.word_embedding(self.tokenizer(BOS, add_special_tokens=False, return_tensors='pt').input_ids[0].to(self.model_device))
@@ -130,6 +162,12 @@ class Model(torch.nn.Module):
             self.projector.apply(initialize_weights)
             if self.lm_head is not None:
                 self.lm_head.reset_parameters()
+            if self.sample_head is not None:
+                self.sample_head.reset_parameters()
+            if self.label_head is not None:
+                self.label_head.reset_parameters()
+            if self.regression_head is not None:
+                self.regression_head.reset_parameters()
 
     @property
     def device(self):
@@ -290,6 +328,30 @@ class Model(torch.nn.Module):
             demo_labels = [torch.tensor(label_ids, device=self.device) for label_ids in demo_label_ids]
         return demo_node_embeds, demo_labels
 
+    def get_label_representations(self) -> Tensor:
+        label_embeds = []
+        for token_ids in self.label_token_ids:
+            token_tensor = torch.tensor(token_ids, device=self.device, dtype=torch.long)
+            token_embeds = self.word_embedding(token_tensor)
+            label_embeds.append(token_embeds.mean(dim=0))
+        label_embeds = torch.stack(label_embeds, dim=0)
+        label_embeds = self.label_head(label_embeds)
+        return F.normalize(label_embeds, dim=-1)
+
+    def encode_prompt_representation(self, inputs_embeds: Tensor, attention_mask: Tensor) -> Tensor:
+        with self.maybe_autocast():
+            outputs = self.model(
+                inputs_embeds=inputs_embeds,
+                attention_mask=attention_mask,
+                return_dict=True,
+                output_hidden_states=True,
+            )
+        hidden = outputs.hidden_states[-1]
+        last_indices = attention_mask.sum(dim=1).long().clamp_min(1) - 1
+        batch_indices = torch.arange(hidden.size(0), device=hidden.device)
+        prompt_repr = hidden[batch_indices, last_indices]
+        return prompt_repr
+
     def score_multiclass_candidates(self, inputs_embeds: Tensor, attention_mask: Tensor) -> Tensor:
         batch_size = inputs_embeds.size(0)
         with self.maybe_autocast():
@@ -438,7 +500,8 @@ class Model(torch.nn.Module):
         question += ' Answer: '  # https://huggingface.co/docs/transformers/tasks/prompting
         task_descs = self.tokenizer(task_desc, add_special_tokens=False)
         questions = self.tokenizer(question, add_special_tokens=False)
-        if not inference and not self.output_mlp: labels = self.label_tokenize(batch, entity_table)
+        if not inference and self.uses_generation_supervision:
+            labels = self.label_tokenize(batch, entity_table)
         if context: neighbors = self.recursive_sample(batch, entity_table, torch.arange(batch_size), num_hops=1)
         if self.num_demo > 0 and demo_info is not None:
             # construct in-context demos
@@ -484,7 +547,7 @@ class Model(torch.nn.Module):
         for i in range(batch_size):  # TODO: do not need iteration (simplified)
             # Add bos & eos token
             input_ids = task_descs.input_ids + questions.input_ids + self.eos_user_id_list
-            if not inference and not self.output_mlp:
+            if not inference and self.uses_generation_supervision:
                 label_input_ids = labels.input_ids[i] + self.eos_id_list  # EOS ceases generation
                 input_ids += label_input_ids
 
@@ -508,7 +571,7 @@ class Model(torch.nn.Module):
 
             batch_inputs_embeds.append(inputs_embeds)
             batch_attention_mask.append([1] * inputs_embeds.shape[0])
-            if not inference and not self.output_mlp:
+            if not inference and self.uses_generation_supervision:
                 label_input_ids = [IGNORE_INDEX] * (inputs_embeds.shape[0] - len(label_input_ids)) + label_input_ids
                 batch_label_input_ids.append(label_input_ids)  # auto-regressive + teacher forcing, https://github.com/XiaoxinHe/G-Retriever/issues/17
 
@@ -518,17 +581,23 @@ class Model(torch.nn.Module):
             pad_length = max_length - batch_inputs_embeds[i].shape[0]
             batch_inputs_embeds[i] = torch.cat([self.pad_embeds.repeat(pad_length, 1), batch_inputs_embeds[i]])
             batch_attention_mask[i] = [0] * pad_length + batch_attention_mask[i]
-            if not inference and not self.output_mlp:
+            if not inference and self.uses_generation_supervision:
                 batch_label_input_ids[i] = [IGNORE_INDEX] * pad_length + batch_label_input_ids[i]  # `inputs_embeds` contain `labels`
 
         inputs_embeds = torch.stack(batch_inputs_embeds, dim=0).to(self.device)
         attention_mask = torch.tensor(batch_attention_mask).to(self.device)
 
-        if self.output_mlp:
-            with self.maybe_autocast():  # no need to call `generate() since we want hidden_states instead of new tokens`
-                outputs = self.model(inputs_embeds=inputs_embeds, attention_mask=attention_mask, return_dict=True, output_hidden_states=True)
-            hidden = outputs.hidden_states[-1][..., -1, :]  # last hidden states
-            pred = self.lm_head(hidden)
+        if self.output_mlp or self.uses_label_scorer or self.uses_regression_head:
+            hidden = self.encode_prompt_representation(inputs_embeds, attention_mask)
+            if self.uses_label_scorer:
+                sample_repr = self.sample_head(hidden)
+                sample_repr = F.normalize(sample_repr, dim=-1)
+                label_repr = self.get_label_representations()
+                pred = torch.matmul(sample_repr, label_repr.t())
+            elif self.uses_regression_head:
+                pred = self.regression_head(hidden)
+            else:
+                pred = self.lm_head(hidden)
             if pred.dim() > 1 and pred.size(1) == 1:
                 pred = pred.view(-1)
             return pred
