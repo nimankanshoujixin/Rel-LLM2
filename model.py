@@ -335,6 +335,10 @@ class Model(torch.nn.Module):
             token_embeds = self.word_embedding(token_tensor)
             label_embeds.append(token_embeds.mean(dim=0))
         label_embeds = torch.stack(label_embeds, dim=0)
+        label_embeds = label_embeds.to(
+            device=next(self.label_head.parameters()).device,
+            dtype=next(self.label_head.parameters()).dtype,
+        )
         label_embeds = self.label_head(label_embeds)
         return F.normalize(label_embeds, dim=-1)
 
@@ -590,13 +594,25 @@ class Model(torch.nn.Module):
         if self.output_mlp or self.uses_label_scorer or self.uses_regression_head:
             hidden = self.encode_prompt_representation(inputs_embeds, attention_mask)
             if self.uses_label_scorer:
+                hidden = hidden.to(
+                    device=next(self.sample_head.parameters()).device,
+                    dtype=next(self.sample_head.parameters()).dtype,
+                )
                 sample_repr = self.sample_head(hidden)
                 sample_repr = F.normalize(sample_repr, dim=-1)
                 label_repr = self.get_label_representations()
                 pred = torch.matmul(sample_repr, label_repr.t())
             elif self.uses_regression_head:
+                hidden = hidden.to(
+                    device=next(self.regression_head.parameters()).device,
+                    dtype=next(self.regression_head.parameters()).dtype,
+                )
                 pred = self.regression_head(hidden)
             else:
+                hidden = hidden.to(
+                    device=next(self.lm_head.parameters()).device,
+                    dtype=next(self.lm_head.parameters()).dtype,
+                )
                 pred = self.lm_head(hidden)
             if pred.dim() > 1 and pred.size(1) == 1:
                 pred = pred.view(-1)
