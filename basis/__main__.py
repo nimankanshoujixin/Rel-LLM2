@@ -28,9 +28,17 @@ def parse_args() -> argparse.Namespace:
         help="Download the dataset through RelBench if needed.",
     )
     parser.add_argument(
-        "--full-db",
-        action="store_true",
-        help="Build from the full database instead of truncating at test timestamp.",
+        "--db-scope",
+        type=str,
+        default="train_visible",
+        choices=["train_visible", "upto_test", "full"],
+        help=(
+            "Database scope used to build the basis. "
+            "'train_visible' uses the full historical database visible at training time, "
+            "truncated at dataset.val_timestamp. "
+            "'upto_test' uses data up to dataset.test_timestamp. "
+            "'full' uses the complete database including future rows."
+        ),
     )
     parser.add_argument(
         "--device",
@@ -41,10 +49,20 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+def resolve_db(dataset, db_scope: str):
+    if db_scope == "train_visible":
+        return dataset.get_db(upto_test_timestamp=False).upto(dataset.val_timestamp)
+    if db_scope == "upto_test":
+        return dataset.get_db(upto_test_timestamp=True)
+    if db_scope == "full":
+        return dataset.get_db(upto_test_timestamp=False)
+    raise ValueError(f"Unsupported db scope: {db_scope}")
+
+
 def main() -> None:
     args = parse_args()
     dataset = get_dataset(args.dataset, download=args.download)
-    db = dataset.get_db(upto_test_timestamp=not args.full_db)
+    db = resolve_db(dataset, args.db_scope)
 
     device = args.device
     if device is None:
