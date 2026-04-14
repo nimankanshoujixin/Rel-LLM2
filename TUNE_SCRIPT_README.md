@@ -13,6 +13,10 @@ By default, the script fixes these training-mode choices:
 - `output_mlp=False`
 - `pretrain=False`
 - `debug=True`
+- `basis_root=artifacts/basis`
+- `disable_basis_cls_head=False`
+- `basis_tau=0.07`
+- `basis_lambda_bce=1.0`
 
 This means the default tuning scenario is:
 
@@ -22,6 +26,7 @@ This means the default tuning scenario is:
 - no `output_mlp`
 - no pretraining
 - no `wandb` logging during tuning
+- impl-a basis alignment enabled
 
 These are also fixed unless you override them manually:
 
@@ -38,6 +43,17 @@ These are also fixed unless you override them manually:
 - `task`
 - `cache_dir`
 - `text_embedder_path`
+- `basis_root`
+- `basis_artifact`
+- `disable_basis_cls_head`
+- `basis_tau`
+- `basis_tau_res` when basis tuning is disabled
+- `basis_topk` when basis tuning is disabled
+- `basis_residual_alpha` when basis tuning is disabled
+- `basis_lambda_bce`
+- `basis_lambda_ctr` when basis tuning is disabled
+- `basis_lambda_mgn` when basis tuning is disabled
+- `basis_margin` when basis tuning is disabled
 
 Code-internal hyperparameters are not tuned by this script, including:
 
@@ -62,6 +78,7 @@ During tuning:
 - intermediate trial runs do not execute the test split
 - the test split is run only once, after the best trial is selected
 - `--reset-study` removes both the existing Optuna study record and `optuna_runs/<study_name>/` before starting
+- impl-a runs require a prebuilt basis artifact at `artifacts/basis/<dataset>/basis.pt` unless you pass `--basis-artifact`
 
 ---
 
@@ -97,6 +114,21 @@ Other useful arguments:
 - `--val-size`
 - `--cache-dir`
 - `--text-embedder-path`
+- `--basis-root`
+- `--basis-artifact`
+- `--disable-basis-cls-head / --no-disable-basis-cls-head`
+- `--basis-tau`
+- `--basis-tau-res`
+- `--basis-topk`
+- `--basis-residual-alpha`
+- `--basis-lambda-bce`
+- `--basis-lambda-ctr`
+- `--basis-lambda-mgn`
+- `--basis-margin`
+- `--tune-basis-hparams / --no-tune-basis-hparams`
+- `--basis-topk-choices`
+- `--basis-tau-res-choices`
+- `--basis-margin-choices`
 - `--python-executable`
 - `--output-dir`
 
@@ -170,6 +202,36 @@ So the final command uses:
 --loss_class_weight 1.0 <w_pos>
 ```
 
+### Impl-a basis alignment
+
+When `--disable-basis-cls-head` is not set, the script also tunes a small subset of impl-a basis hyperparameters by default:
+
+- `basis_tau_res`
+  - default choices: `{0.03, 0.07, 0.15}`
+
+- `basis_topk`
+  - default choices: `{4, 8, 16}`
+
+- `basis_residual_alpha`
+  - range: `0.02 ~ 0.5`
+  - sampling: log-uniform
+
+- `basis_lambda_ctr`
+  - range: `1e-3 ~ 1.0`
+  - sampling: log-uniform
+
+- `basis_lambda_mgn`
+  - range: `1e-3 ~ 1.0`
+  - sampling: log-uniform
+
+- `basis_margin`
+  - default choices: `{0.1, 0.2, 0.4}`
+
+These remain fixed unless you override them manually:
+
+- `basis_tau`
+- `basis_lambda_bce`
+
 ---
 
 ## Default search space summary
@@ -185,6 +247,12 @@ aggr:              {sum, mean}
 temporal_strategy: {uniform, last}
 batch_size:        {1, 2, 4}
 w_pos:             0.5 ~ 3.0
+basis_tau_res:     {0.03, 0.07, 0.15}
+basis_topk:        {4, 8, 16}
+basis_residual_alpha: 0.02 ~ 0.5   (log)
+basis_lambda_ctr:  1e-3 ~ 1.0      (log)
+basis_lambda_mgn:  1e-3 ~ 1.0      (log)
+basis_margin:      {0.1, 0.2, 0.4}
 ```
 
 ---
@@ -195,6 +263,7 @@ w_pos:             0.5 ~ 3.0
 python tune_hyperparameters.py \
   --dataset rel-amazon \
   --task user-churn \
+  --basis-root artifacts/basis \
   --gpu-id 6 \
   --n-trials 30 \
   --train-steps 4096 \
@@ -210,6 +279,7 @@ python tune_hyperparameters.py \
 python tune_hyperparameters.py \
   --dataset rel-amazon \
   --task user-churn \
+  --basis-root artifacts/basis \
   --gpu-id 4,5,6,7 \
   --nproc-per-node 4 \
   --master-port 29501 \
