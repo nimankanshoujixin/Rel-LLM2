@@ -1,8 +1,13 @@
 from pathlib import Path
+import sys
 from types import SimpleNamespace
 
 import pandas as pd
 import torch
+
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
 from basis.builder import DBConditionedSemanticBasisBuilder
 
