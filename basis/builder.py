@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterable
 
+import numpy as np
 import pandas as pd
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
@@ -213,7 +214,7 @@ class DBConditionedSemanticBasisBuilder:
             )
 
             if dtype_bucket in TEXT_DTYPES:
-                category_support = int(series.nunique(dropna=True))
+                category_support = self._safe_nunique(series)
                 category_bucket = self._bucket_category_support(category_support)
                 yield BasisItem(
                     basis_id=f"stat::{table_name}::{column_name}::category_support::{category_bucket}",
@@ -305,7 +306,63 @@ class DBConditionedSemanticBasisBuilder:
     def _safe_unique_ratio(series: pd.Series) -> float:
         if len(series) == 0:
             return 0.0
-        return float(series.nunique(dropna=True) / max(len(series), 1))
+        return float(DBConditionedSemanticBasisBuilder._safe_nunique(series) / max(len(series), 1))
+
+    @staticmethod
+    def _safe_nunique(series: pd.Series) -> int:
+        normalized_values = []
+        for value in series.tolist():
+            if DBConditionedSemanticBasisBuilder._is_missing_value(value):
+                continue
+            normalized_values.append(DBConditionedSemanticBasisBuilder._normalize_hashable(value))
+        return len(set(normalized_values))
+
+    @staticmethod
+    def _is_missing_value(value: Any) -> bool:
+        if value is None:
+            return True
+        if isinstance(value, float) and pd.isna(value):
+            return True
+        if isinstance(value, (pd.Timestamp, pd.Timedelta)):
+            return pd.isna(value)
+        if isinstance(value, np.ndarray):
+            return False
+        try:
+            result = pd.isna(value)
+        except Exception:
+            return False
+        if isinstance(result, (bool, np.bool_)):
+            return bool(result)
+        return False
+
+    @staticmethod
+    def _normalize_hashable(value: Any) -> Any:
+        if isinstance(value, np.ndarray):
+            return ("ndarray", tuple(DBConditionedSemanticBasisBuilder._normalize_hashable(v) for v in value.tolist()))
+        if isinstance(value, (list, tuple)):
+            return (type(value).__name__, tuple(DBConditionedSemanticBasisBuilder._normalize_hashable(v) for v in value))
+        if isinstance(value, dict):
+            return (
+                "dict",
+                tuple(
+                    sorted(
+                        (str(k), DBConditionedSemanticBasisBuilder._normalize_hashable(v))
+                        for k, v in value.items()
+                    )
+                ),
+            )
+        if isinstance(value, set):
+            return ("set", tuple(sorted(DBConditionedSemanticBasisBuilder._normalize_hashable(v) for v in value)))
+        if isinstance(value, pd.Timestamp):
+            return ("timestamp", value.isoformat())
+        if isinstance(value, pd.Timedelta):
+            return ("timedelta", value.isoformat())
+        if hasattr(value, "item") and callable(value.item):
+            try:
+                return value.item()
+            except Exception:
+                pass
+        return value
 
     @staticmethod
     def _bucket_ratio(value: float) -> str:
