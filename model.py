@@ -2,12 +2,13 @@ from typing import Any, Dict, List
 import contextlib
 import random
 import copy
+from collections import defaultdict
 
 import torch
 import torch.distributed as dist
 import torch.nn.functional as F
 from torch import Tensor
-from torch.nn import Embedding, ModuleDict, Sigmoid, Sequential, Linear, Dropout
+from torch.nn import Embedding, ModuleDict, Sigmoid, Sequential, Linear, Dropout, LayerNorm
 
 import torch_frame.data
 from torch_frame.data.stats import StatType
@@ -36,7 +37,10 @@ class Model(torch.nn.Module):
     def __init__(self, data: HeteroData, col_stats_dict: Dict[str, Dict[str, Dict[StatType, Any]]], num_layers: int, channels: int, out_channels: int, aggr: str,
                  norm: str = "batch_norm", dropout=0.0, shallow_list: List[NodeType] = [],  # List of node types to add shallow embeddings to input
                  id_awareness: bool = False, model_type: str = "meta-llama/Llama-3.2-1B", max_new_tokens=1, llm_frozen=False, output_mlp=False, output_probs=True, num_demo=4,
-                 dataset=None, task=None, gamma=2.0, alpha=[1.0, 1.0], mask_ratio=0.5, pretrain_random_table=False, pretrain_mask_cell=True, device: torch.device | None = None):
+                 dataset=None, task=None, gamma=2.0, alpha=[1.0, 1.0], mask_ratio=0.5, pretrain_random_table=False, pretrain_mask_cell=True,
+                 device: torch.device | None = None, basis_artifact: Dict[str, Any] | None = None, basis_tau: float = 0.07, basis_tau_res: float = 0.07,
+                 basis_topk: int = 8, basis_residual_alpha: float = 0.1, basis_lambda_bce: float = 1.0, basis_lambda_ctr: float = 0.1,
+                 basis_lambda_mgn: float = 0.1, basis_margin: float = 0.2):
         super().__init__()
         self.encoder = HeteroEncoder(channels=channels, node_to_col_names_dict={node_type: data[node_type].tf.col_names_dict for node_type in data.node_types},
                                      node_to_col_stats=col_stats_dict, )
@@ -60,6 +64,24 @@ class Model(torch.nn.Module):
         self.sample_head = None
         self.label_head = None
         self.regression_head = None
+        self.basis_enabled = False
+        self.basis_topk = basis_topk
+        self.basis_tau = basis_tau
+        self.basis_tau_res = basis_tau_res
+        self.basis_residual_alpha = basis_residual_alpha
+        self.basis_lambda_bce = basis_lambda_bce
+        self.basis_lambda_ctr = basis_lambda_ctr
+        self.basis_lambda_mgn = basis_lambda_mgn
+        self.basis_margin = basis_margin
+        self.latest_align_loss = 0.0
+        self.latest_align_components = {"bce": 0.0, "center": 0.0, "margin": 0.0}
+        self.basis_ids: list[str] = []
+        self.basis_types: list[str] = []
+        self.basis_descs: list[str] = []
+        self.basis_indices_by_table: dict[str, list[int]] = {}
+        self.basis_indices_by_table_pair: dict[tuple[str, str], list[int]] = {}
+        self.basis_indices_by_join_pair: dict[tuple[str, str], list[int]] = {}
+        self.basis_indices_by_join_triplet: dict[tuple[str, str, str], list[int]] = {}
 
         # pretrain setup
         self.pretrain_mask_cell = pretrain_mask_cell
@@ -111,6 +133,8 @@ class Model(torch.nn.Module):
             out_dim = self.word_embedding.embedding_dim
             self.projector = Sequential(Linear(channels, 1024), Sigmoid(), Dropout(dropout), Linear(1024, out_dim), Dropout(dropout)).to(self.model_device)
             self.lm_head = MLP(out_dim, out_channels=out_channels, norm=norm, num_layers=1, dropout=dropout) if self.output_mlp else None
+            if basis_artifact is not None:
+                self._init_basis_alignment(basis_artifact, out_dim)
             self.uses_label_scorer = self.task.task_type in [
                 TaskType.BINARY_CLASSIFICATION,
                 TaskType.MULTICLASS_CLASSIFICATION,
@@ -168,6 +192,73 @@ class Model(torch.nn.Module):
                 self.label_head.reset_parameters()
             if self.regression_head is not None:
                 self.regression_head.reset_parameters()
+            if hasattr(self, "basis_query_norm"):
+                self.basis_query_norm.reset_parameters()
+
+    def _init_basis_alignment(self, basis_artifact: Dict[str, Any], out_dim: int) -> None:
+        basis_vectors = basis_artifact["A_db"].to(dtype=torch.float32)
+        if basis_vectors.dim() != 2 or basis_vectors.size(1) != out_dim:
+            raise ValueError(
+                f"Basis artifact dimension mismatch: expected [K, {out_dim}], got {tuple(basis_vectors.shape)}."
+            )
+        self.register_buffer("basis_vectors", basis_vectors, persistent=False)
+        self.register_buffer("basis_norm", F.normalize(basis_vectors, dim=-1), persistent=False)
+        self.basis_ids = list(basis_artifact["basis_ids"])
+        self.basis_types = list(basis_artifact["basis_types"])
+        self.basis_descs = list(basis_artifact["basis_descs"])
+        (
+            self.basis_indices_by_table,
+            self.basis_indices_by_table_pair,
+            self.basis_indices_by_join_pair,
+            self.basis_indices_by_join_triplet,
+        ) = self._build_basis_index_maps(self.basis_ids)
+        self.basis_query_norm = LayerNorm(out_dim).to(self.model_device)
+        self.basis_enabled = True
+
+    @staticmethod
+    def _canonical_pair(table_a: str, table_b: str) -> tuple[str, str]:
+        return tuple(sorted((table_a, table_b)))
+
+    @staticmethod
+    def _canonical_triplet(table_a: str, table_b: str, table_c: str) -> tuple[str, str, str]:
+        forward = (table_a, table_b, table_c)
+        backward = (table_c, table_b, table_a)
+        return min(forward, backward)
+
+    def _build_basis_index_maps(
+        self, basis_ids: list[str]
+    ) -> tuple[dict[str, list[int]], dict[tuple[str, str], list[int]], dict[tuple[str, str], list[int]], dict[tuple[str, str, str], list[int]]]:
+        table_map: dict[str, list[int]] = defaultdict(list)
+        table_pair_map: dict[tuple[str, str], list[int]] = defaultdict(list)
+        join_pair_map: dict[tuple[str, str], list[int]] = defaultdict(list)
+        join_triplet_map: dict[tuple[str, str, str], list[int]] = defaultdict(list)
+
+        for idx, basis_id in enumerate(basis_ids):
+            parts = basis_id.split("::")
+            prefix = parts[0]
+            if prefix == "table":
+                table_map[parts[1]].append(idx)
+            elif prefix == "column":
+                table_map[parts[1]].append(idx)
+            elif prefix == "pk":
+                table_map[parts[1]].append(idx)
+            elif prefix == "stat":
+                table_map[parts[1]].append(idx)
+            elif prefix == "fk":
+                src_table, dst_table = parts[1], parts[3]
+                table_pair_map[self._canonical_pair(src_table, dst_table)].append(idx)
+            elif prefix == "join":
+                if len(parts) == 3:
+                    join_pair_map[self._canonical_pair(parts[1], parts[2])].append(idx)
+                elif len(parts) == 4:
+                    join_triplet_map[self._canonical_triplet(parts[1], parts[2], parts[3])].append(idx)
+
+        return (
+            dict(table_map),
+            dict(table_pair_map),
+            dict(join_pair_map),
+            dict(join_triplet_map),
+        )
 
     @property
     def device(self):
@@ -478,7 +569,114 @@ class Model(torch.nn.Module):
                 all_embeddings.append(recursive_collect(target_type, target_id, neighbors))
         return torch.cat(all_embeddings) if all_embeddings else None
 
+    def _collect_basis_indices(
+        self,
+        entity_table: str,
+        sample_neighbors: dict[str, dict],
+    ) -> list[int]:
+        indices = set(self.basis_indices_by_table.get(entity_table, []))
+
+        def traverse(current_table: str, subtree: dict[str, dict], path: list[str]) -> None:
+            for next_table, node_dict in subtree.items():
+                indices.update(self.basis_indices_by_table.get(next_table, []))
+                indices.update(
+                    self.basis_indices_by_table_pair.get(self._canonical_pair(current_table, next_table), [])
+                )
+                indices.update(
+                    self.basis_indices_by_join_pair.get(self._canonical_pair(current_table, next_table), [])
+                )
+                new_path = path + [next_table]
+                if len(new_path) >= 3:
+                    indices.update(
+                        self.basis_indices_by_join_triplet.get(
+                            self._canonical_triplet(new_path[-3], new_path[-2], new_path[-1]),
+                            [],
+                        )
+                    )
+                for child_subtree in node_dict.values():
+                    traverse(next_table, child_subtree, new_path)
+
+        traverse(entity_table, sample_neighbors, [entity_table])
+        return sorted(indices)
+
+    def align_graph_prompts(
+        self,
+        graph_prompts: list[Tensor],
+        entity_table: str,
+        basis_neighbors: dict[int, dict[str, dict]],
+    ) -> tuple[list[Tensor], Tensor]:
+        if not self.basis_enabled or not graph_prompts:
+            zero = self.basis_vectors.new_zeros(())
+            self.latest_align_components = {"bce": 0.0, "center": 0.0, "margin": 0.0}
+            return graph_prompts, zero
+
+        pooled = torch.stack([prompt.mean(dim=0) for prompt in graph_prompts], dim=0)
+        q = self.basis_query_norm(
+            pooled.to(
+                device=next(self.basis_query_norm.parameters()).device,
+                dtype=next(self.basis_query_norm.parameters()).dtype,
+            )
+        ).float()
+        q_norm = F.normalize(q, dim=-1)
+        logits = torch.matmul(q_norm, self.basis_norm.t()) / self.basis_tau
+
+        batch_size = len(graph_prompts)
+        basis_targets = torch.zeros(
+            (batch_size, self.basis_vectors.size(0)),
+            device=logits.device,
+            dtype=torch.float32,
+        )
+        pos_masks = torch.zeros_like(basis_targets, dtype=torch.bool)
+        for sample_idx in range(batch_size):
+            pos_indices = self._collect_basis_indices(entity_table, basis_neighbors[sample_idx])
+            if not pos_indices:
+                pos_indices = self.basis_indices_by_table.get(entity_table, [])
+            basis_targets[sample_idx, pos_indices] = 1.0
+            pos_masks[sample_idx, pos_indices] = True
+
+        loss_bce = F.binary_cross_entropy_with_logits(logits, basis_targets)
+
+        pos_counts = pos_masks.sum(dim=1, keepdim=True).clamp_min(1)
+        c_pos = torch.matmul(pos_masks.float(), self.basis_norm) / pos_counts
+        c_pos = F.normalize(c_pos, dim=-1)
+        cos_pos = F.cosine_similarity(q_norm, c_pos, dim=-1)
+        loss_center = (1.0 - cos_pos).mean()
+
+        neg_logits = logits.masked_fill(pos_masks, float("-inf"))
+        neg_idx = neg_logits.argmax(dim=1)
+        a_neg = self.basis_norm[neg_idx]
+        cos_neg = F.cosine_similarity(q_norm, a_neg, dim=-1)
+        loss_margin = F.relu(self.basis_margin - cos_pos + cos_neg).mean()
+
+        align_loss = (
+            self.basis_lambda_bce * loss_bce
+            + self.basis_lambda_ctr * loss_center
+            + self.basis_lambda_mgn * loss_margin
+        )
+        self.latest_align_components = {
+            "bce": float(loss_bce.detach().cpu()),
+            "center": float(loss_center.detach().cpu()),
+            "margin": float(loss_margin.detach().cpu()),
+        }
+
+        topk = min(self.basis_topk, self.basis_vectors.size(0))
+        topk_vals, topk_idx = torch.topk(logits, k=topk, dim=-1)
+        topk_weights = torch.softmax(topk_vals / self.basis_tau_res, dim=-1)
+        residual = (
+            self.basis_vectors[topk_idx].to(device=pooled.device, dtype=pooled.dtype)
+            * topk_weights.unsqueeze(-1).to(dtype=pooled.dtype)
+        ).sum(dim=1)
+
+        aligned_prompts = [
+            prompt + self.basis_residual_alpha * residual[i].unsqueeze(0).to(prompt.dtype)
+            for i, prompt in enumerate(graph_prompts)
+        ]
+        return aligned_prompts, align_loss
+
     def forward(self, batch: HeteroData, entity_table: NodeType, context=True, demo_info=None, inference: bool = False, pretrain_mode: bool = False) -> Tensor:
+        if self.model is not None:
+            self.latest_align_loss = self.word_embedding.weight.new_zeros(())
+            self.latest_align_components = {"bce": 0.0, "center": 0.0, "margin": 0.0}
         if pretrain_mode:
             return self.pretrain(batch, entity_table)
         x_dict, batch_size = self.encode(batch, entity_table)
@@ -506,7 +704,12 @@ class Model(torch.nn.Module):
         questions = self.tokenizer(question, add_special_tokens=False)
         if not inference and self.uses_generation_supervision:
             labels = self.label_tokenize(batch, entity_table)
-        if context: neighbors = self.recursive_sample(batch, entity_table, torch.arange(batch_size), num_hops=1)
+        neighbors = None
+        basis_neighbors = None
+        if context:
+            neighbors = self.recursive_sample(batch, entity_table, torch.arange(batch_size), num_hops=1)
+        if self.basis_enabled:
+            basis_neighbors = self.recursive_sample(batch, entity_table, torch.arange(batch_size), num_hops=2)[entity_table]
         if self.num_demo > 0 and demo_info is not None:
             # construct in-context demos
             demo_node_embeds, demo_labels = demo_info
@@ -543,7 +746,23 @@ class Model(torch.nn.Module):
                     for row in sampled_indices
                 ]
 
-        # print(neighbors)
+        graph_prompts = []
+        for i in range(batch_size):
+            graph_prompt = node_embed[i].unsqueeze(0)
+            if context and neighbors is not None:
+                neighbor_embed = self.get_neighbor_embedding(neighbors[entity_table][i], x_dict)
+                if neighbor_embed is not None:
+                    neighbor_embed = self.projector(neighbor_embed)
+                    graph_prompt = torch.cat([graph_prompt, neighbor_embed])
+            graph_prompts.append(graph_prompt)
+
+        if self.basis_enabled and basis_neighbors is not None:
+            graph_prompts, self.latest_align_loss = self.align_graph_prompts(
+                graph_prompts,
+                entity_table,
+                basis_neighbors,
+            )
+
         # tokenizer happens on CPU
         batch_inputs_embeds = []
         batch_attention_mask = []
@@ -564,14 +783,7 @@ class Model(torch.nn.Module):
                     demo_embeds += [demo_node_embeds[i][k].unsqueeze(0), self.word_embedding(demo_label_ids)]
                 demo_embeds.append(node_embed[i].unsqueeze(0))  # append the seed entity at last
                 inputs_embeds = torch.cat([inputs_embeds[:-1], torch.cat(demo_embeds), inputs_embeds[-1:]])
-            graph_prompt = node_embed[i].unsqueeze(0)
-            if context:
-                neighbor_embed = self.get_neighbor_embedding(neighbors[entity_table][i], x_dict)
-                if neighbor_embed is not None:
-                    neighbor_embed = self.projector(neighbor_embed)
-                    # print(neighbor_embed.shape)
-                    graph_prompt = torch.cat([graph_prompt, neighbor_embed])
-            inputs_embeds = torch.cat([self.bos_embeds, graph_prompt, inputs_embeds], dim=0)  # node embed after BOS
+            inputs_embeds = torch.cat([self.bos_embeds, graph_prompts[i], inputs_embeds], dim=0)  # node embed after BOS
 
             batch_inputs_embeds.append(inputs_embeds)
             batch_attention_mask.append([1] * inputs_embeds.shape[0])
