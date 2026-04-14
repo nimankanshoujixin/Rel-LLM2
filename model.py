@@ -543,7 +543,14 @@ class Model(torch.nn.Module):
             for node in tmp_dict.keys():
                 for next_node_type, nodes in next_nodes.items():   # Recursive call for the next hop
                     if next_node_type in tmp_dict[node].keys():
-                        sample_neighbors(nodes, next_node_type, depth + 1, tmp_dict[node][next_node_type])
+                        child_nodes = set(tmp_dict[node][next_node_type].keys())
+                        if child_nodes:
+                            sample_neighbors(
+                                child_nodes,
+                                next_node_type,
+                                depth + 1,
+                                tmp_dict[node][next_node_type],
+                            )
 
         sample_neighbors(set(target_nodes.tolist()), node_type, depth=0, tmp_dict=neighbor_dict[node_type])   # Start recursive sampling from target nodes
         return neighbor_dict
