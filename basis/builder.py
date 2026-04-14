@@ -10,7 +10,7 @@ import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
 
-NUMERIC_DTYPES = {"integer", "float", "boolean"}
+NUMERIC_DTYPES = {"integer", "float"}
 TEXT_DTYPES = {"categorical", "string", "text"}
 
 
@@ -395,7 +395,10 @@ class DBConditionedSemanticBasisBuilder:
         numeric = pd.to_numeric(series, errors="coerce").dropna()
         if numeric.empty:
             return "empty"
-        quantiles = numeric.quantile([0.10, 0.25, 0.50, 0.75, 0.90]).tolist()
+        try:
+            quantiles = numeric.quantile([0.10, 0.25, 0.50, 0.75, 0.90]).tolist()
+        except Exception:
+            return "empty"
         buckets = [self._bucket_signed_value(float(value)) for value in quantiles]
         return "__".join(
             [
