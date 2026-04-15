@@ -208,6 +208,7 @@ class Model(torch.nn.Module):
         self.basis_descs = list(basis_artifact["basis_descs"])
         (
             self.basis_indices_by_table,
+            self.basis_indices_by_table_prefix,
             self.basis_indices_by_table_pair,
             self.basis_indices_by_join_pair,
             self.basis_indices_by_join_triplet,
@@ -227,8 +228,15 @@ class Model(torch.nn.Module):
 
     def _build_basis_index_maps(
         self, basis_ids: list[str]
-    ) -> tuple[dict[str, list[int]], dict[tuple[str, str], list[int]], dict[tuple[str, str], list[int]], dict[tuple[str, str, str], list[int]]]:
+    ) -> tuple[
+        dict[str, list[int]],
+        dict[str, dict[str, list[int]]],
+        dict[tuple[str, str], list[int]],
+        dict[tuple[str, str], list[int]],
+        dict[tuple[str, str, str], list[int]],
+    ]:
         table_map: dict[str, list[int]] = defaultdict(list)
+        table_prefix_map: dict[str, dict[str, list[int]]] = defaultdict(lambda: defaultdict(list))
         table_pair_map: dict[tuple[str, str], list[int]] = defaultdict(list)
         join_pair_map: dict[tuple[str, str], list[int]] = defaultdict(list)
         join_triplet_map: dict[tuple[str, str, str], list[int]] = defaultdict(list)
@@ -238,12 +246,16 @@ class Model(torch.nn.Module):
             prefix = parts[0]
             if prefix == "table":
                 table_map[parts[1]].append(idx)
+                table_prefix_map[parts[1]][prefix].append(idx)
             elif prefix == "column":
                 table_map[parts[1]].append(idx)
+                table_prefix_map[parts[1]][prefix].append(idx)
             elif prefix == "pk":
                 table_map[parts[1]].append(idx)
+                table_prefix_map[parts[1]][prefix].append(idx)
             elif prefix == "stat":
                 table_map[parts[1]].append(idx)
+                table_prefix_map[parts[1]][prefix].append(idx)
             elif prefix == "fk":
                 src_table, dst_table = parts[1], parts[3]
                 table_pair_map[self._canonical_pair(src_table, dst_table)].append(idx)
@@ -255,6 +267,7 @@ class Model(torch.nn.Module):
 
         return (
             dict(table_map),
+            {table: {prefix: list(indices) for prefix, indices in prefix_map.items()} for table, prefix_map in table_prefix_map.items()},
             dict(table_pair_map),
             dict(join_pair_map),
             dict(join_triplet_map),
@@ -576,35 +589,101 @@ class Model(torch.nn.Module):
                 all_embeddings.append(recursive_collect(target_type, target_id, neighbors))
         return torch.cat(all_embeddings) if all_embeddings else None
 
-    def _collect_basis_indices(
+    def _add_basis_weight(
+        self,
+        target: dict[int, float],
+        indices: list[int],
+        weight: float,
+    ) -> None:
+        if weight <= 0.0:
+            return
+        for idx in indices:
+            target[idx] = max(target.get(idx, 0.0), weight)
+
+    def _add_table_basis_weights(
+        self,
+        target: dict[int, float],
+        table_name: str,
+        *,
+        table_weight: float,
+        column_weight: float,
+        pk_weight: float,
+        stat_weight: float,
+    ) -> None:
+        prefix_map = self.basis_indices_by_table_prefix.get(table_name, {})
+        self._add_basis_weight(target, prefix_map.get("table", []), table_weight)
+        self._add_basis_weight(target, prefix_map.get("column", []), column_weight)
+        self._add_basis_weight(target, prefix_map.get("pk", []), pk_weight)
+        self._add_basis_weight(target, prefix_map.get("stat", []), stat_weight)
+
+    def _collect_basis_targets(
         self,
         entity_table: str,
         sample_neighbors: dict[str, dict],
-    ) -> list[int]:
-        indices = set(self.basis_indices_by_table.get(entity_table, []))
+    ) -> dict[int, float]:
+        target_weights: dict[int, float] = {}
+        self._add_table_basis_weights(
+            target_weights,
+            entity_table,
+            table_weight=1.0,
+            column_weight=0.30,
+            pk_weight=0.35,
+            stat_weight=0.10,
+        )
 
         def traverse(current_table: str, subtree: dict[str, dict], path: list[str]) -> None:
             for next_table, node_dict in subtree.items():
-                indices.update(self.basis_indices_by_table.get(next_table, []))
-                indices.update(
-                    self.basis_indices_by_table_pair.get(self._canonical_pair(current_table, next_table), [])
+                hop = len(path)
+                if hop == 1:
+                    self._add_table_basis_weights(
+                        target_weights,
+                        next_table,
+                        table_weight=0.75,
+                        column_weight=0.15,
+                        pk_weight=0.20,
+                        stat_weight=0.03,
+                    )
+                    pair_weight = 0.90
+                    join_pair_weight = 0.80
+                    triplet_weight = 0.0
+                else:
+                    self._add_table_basis_weights(
+                        target_weights,
+                        next_table,
+                        table_weight=0.45,
+                        column_weight=0.05,
+                        pk_weight=0.08,
+                        stat_weight=0.0,
+                    )
+                    pair_weight = 0.60
+                    join_pair_weight = 0.45
+                    triplet_weight = 0.35
+
+                self._add_basis_weight(
+                    target_weights,
+                    self.basis_indices_by_table_pair.get(self._canonical_pair(current_table, next_table), []),
+                    pair_weight,
                 )
-                indices.update(
-                    self.basis_indices_by_join_pair.get(self._canonical_pair(current_table, next_table), [])
+                self._add_basis_weight(
+                    target_weights,
+                    self.basis_indices_by_join_pair.get(self._canonical_pair(current_table, next_table), []),
+                    join_pair_weight,
                 )
                 new_path = path + [next_table]
                 if len(new_path) >= 3:
-                    indices.update(
+                    self._add_basis_weight(
+                        target_weights,
                         self.basis_indices_by_join_triplet.get(
                             self._canonical_triplet(new_path[-3], new_path[-2], new_path[-1]),
                             [],
-                        )
+                        ),
+                        triplet_weight,
                     )
                 for child_subtree in node_dict.values():
                     traverse(next_table, child_subtree, new_path)
 
         traverse(entity_table, sample_neighbors, [entity_table])
-        return sorted(indices)
+        return target_weights
 
     def align_graph_prompts(
         self,
@@ -635,16 +714,26 @@ class Model(torch.nn.Module):
         )
         pos_masks = torch.zeros_like(basis_targets, dtype=torch.bool)
         for sample_idx in range(batch_size):
-            pos_indices = self._collect_basis_indices(entity_table, basis_neighbors[sample_idx])
-            if not pos_indices:
-                pos_indices = self.basis_indices_by_table.get(entity_table, [])
-            basis_targets[sample_idx, pos_indices] = 1.0
+            pos_targets = self._collect_basis_targets(entity_table, basis_neighbors[sample_idx])
+            if not pos_targets:
+                pos_targets = {
+                    idx: 1.0 for idx in self.basis_indices_by_table_prefix.get(entity_table, {}).get("table", [])
+                }
+            if not pos_targets:
+                pos_targets = {idx: 1.0 for idx in self.basis_indices_by_table.get(entity_table, [])}
+            pos_indices = list(pos_targets.keys())
+            basis_targets[sample_idx, pos_indices] = torch.tensor(
+                [pos_targets[idx] for idx in pos_indices],
+                device=logits.device,
+                dtype=torch.float32,
+            )
             pos_masks[sample_idx, pos_indices] = True
 
         loss_bce = F.binary_cross_entropy_with_logits(logits, basis_targets)
 
-        pos_counts = pos_masks.sum(dim=1, keepdim=True).clamp_min(1)
-        c_pos = torch.matmul(pos_masks.float(), self.basis_norm) / pos_counts
+        pos_weights = basis_targets.clamp_min(0.0)
+        pos_weight_sum = pos_weights.sum(dim=1, keepdim=True).clamp_min(1e-6)
+        c_pos = torch.matmul(pos_weights, self.basis_norm) / pos_weight_sum
         c_pos = F.normalize(c_pos, dim=-1)
         cos_pos = F.cosine_similarity(q_norm, c_pos, dim=-1)
         loss_center = (1.0 - cos_pos).mean()
