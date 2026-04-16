@@ -496,12 +496,6 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--basis_lambda_ctr", type=float, default=0.1)
     parser.add_argument("--basis_lambda_mgn", type=float, default=0.1)
     parser.add_argument("--basis_margin", type=float, default=0.2)
-    parser.add_argument(
-        "--basis_warmup_ratio",
-        type=float,
-        default=0.15,
-        help="Fraction of total train steps used to warm up the basis alignment loss.",
-    )
 
     parser.add_argument(
         "--model_type",
@@ -767,7 +761,6 @@ def main() -> None:
         interval_loss_accum = 0.0
         interval_count_accum = 0
         stop_training = False
-        basis_warmup_steps = max(int(args.train_steps * args.basis_warmup_ratio), 1)
         while steps < args.train_steps:
             loss_accum = count_accum = 0
             remaining_steps = args.train_steps - steps
@@ -781,11 +774,6 @@ def main() -> None:
                 batch = batch.to(device)
                 nums_samples = batch[entity_table].y.size(0)
                 optimizer.zero_grad()
-                align_scale = (
-                    min((steps + 1) / basis_warmup_steps, 1.0)
-                    if getattr(model_for_io, "basis_enabled", False)
-                    else 1.0
-                )
                 if args.model_type == "gnn" or model_for_io.uses_direct_supervision:
                     output_pred = model(batch, task.entity_table)
                     align_loss = model_for_io.latest_align_loss
@@ -800,11 +788,11 @@ def main() -> None:
                         task_loss = loss_fn(output_pred.float(), batch[entity_table].y.long())
                     else:
                         task_loss = loss_fn(output_pred.float(), batch[entity_table].y.float())
-                    loss = task_loss + align_scale * align_loss
+                    loss = task_loss + align_loss
                 else:
                     task_loss = model(batch, task.entity_table)
                     align_loss = model_for_io.latest_align_loss
-                    loss = task_loss + align_scale * align_loss
+                    loss = task_loss + align_loss
                 loss.backward()
                 optimizer.step()
 
@@ -818,7 +806,6 @@ def main() -> None:
                     "loss": train_loss,
                     "task_loss": float(task_loss.detach().item()),
                     "align_loss": float(align_loss.detach().item()) if torch.is_tensor(align_loss) else float(align_loss),
-                    "align_scale": align_scale,
                     "lr": optimizer.param_groups[-1]["lr"],
                 }
                 if getattr(model_for_io, "basis_enabled", False):
