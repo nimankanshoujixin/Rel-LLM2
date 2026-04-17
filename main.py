@@ -455,7 +455,12 @@ def evaluate_loader(
         raise ValueError(
             f"The length of pred and target must be the same (got {len(pred)} and {len(target)})."
         )
-    return {fn.__name__: fn(target, pred) for fn in task.metrics}
+    metrics = {fn.__name__: fn(target, pred) for fn in task.metrics}
+    if task.task_type == TaskType.REGRESSION:
+        zero_pred = np.zeros_like(pred, dtype=np.float32)
+        for fn in task.metrics:
+            metrics[f"zero_pred_{fn.__name__}"] = fn(target, zero_pred)
+    return metrics
 
 
 def resolve_max_steps(max_steps: int) -> int | None:
