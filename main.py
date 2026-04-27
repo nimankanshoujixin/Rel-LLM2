@@ -102,6 +102,18 @@ def cleanup_distributed() -> None:
         dist.destroy_process_group()
 
 
+def load_basis_artifact(args: argparse.Namespace) -> dict[str, Any] | None:
+    if args.model_type == "gnn" or args.disable_basis_token_head:
+        return None
+    basis_path = Path(args.basis_artifact) if args.basis_artifact else Path(args.basis_root) / args.dataset / "basis.pt"
+    if not basis_path.exists():
+        raise FileNotFoundError(
+            f"Expected basis artifact at {basis_path}. Build it first with `python -m basis --dataset {args.dataset} --model-type {args.model_type}` "
+            "or pass --basis_artifact explicitly."
+        )
+    return torch.load(basis_path, map_location="cpu")
+
+
 def load_or_create_stypes(db, cache_path: Path, rank: int) -> Dict[str, Dict[str, stype]]:
     try:
         with open(cache_path, "r") as f:
@@ -473,6 +485,14 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--text_embedder", type=str, default="glove", choices=["glove", "mpnet"])
     parser.add_argument("--text_embedder_path", type=str, default="./cache")
+    parser.add_argument("--basis_root", type=str, default="artifacts/basis")
+    parser.add_argument("--basis_artifact", type=str, default=None)
+    parser.add_argument("--disable_basis_token_head", action="store_true")
+    parser.add_argument("--basis_tau", type=float, default=0.07)
+    parser.add_argument("--basis_residual_alpha", type=float, default=0.1)
+    parser.add_argument("--basis_lambda_tok", type=float, default=1.0)
+    parser.add_argument("--basis_lambda_g", type=float, default=1.0)
+    parser.add_argument("--basis_lambda_sharp", type=float, default=0.01)
 
     parser.add_argument(
         "--model_type",
@@ -565,6 +585,7 @@ def main() -> None:
 
         out_channels, loss_fn, tune_metric, higher_is_better, clamp_min, clamp_max = task_info(task)
         args.clamp_range = (clamp_min, clamp_max)
+        basis_artifact = load_basis_artifact(args)
 
         loader_dict, entity_table = build_loader_dict(args, data, task, rank, world_size)
         rank_print("Entity table: ", entity_table)
@@ -588,6 +609,12 @@ def main() -> None:
             dataset=args.dataset,
             task=task,
             device=device,
+            basis_artifact=basis_artifact,
+            basis_tau=args.basis_tau,
+            basis_residual_alpha=args.basis_residual_alpha,
+            basis_lambda_tok=args.basis_lambda_tok,
+            basis_lambda_g=args.basis_lambda_g,
+            basis_lambda_sharp=args.basis_lambda_sharp,
         ).to(device)
 
         if is_distributed():
@@ -743,19 +770,23 @@ def main() -> None:
                 optimizer.zero_grad()
                 if args.model_type == "gnn" or model_for_io.uses_direct_supervision:
                     output_pred = model(batch, task.entity_table)
+                    align_loss = model_for_io.latest_align_loss
                     output_pred = (
                         output_pred.view(-1)
                         if len(output_pred.size()) > 1 and output_pred.size(1) == 1
                         else output_pred
                     )
                     if task.task_type == TaskType.BINARY_CLASSIFICATION and len(output_pred.size()) > 1 and output_pred.size(1) == 2:
-                        loss = torch.nn.functional.cross_entropy(output_pred.float(), batch[entity_table].y.long())
+                        task_loss = torch.nn.functional.cross_entropy(output_pred.float(), batch[entity_table].y.long())
                     elif task.task_type == TaskType.MULTICLASS_CLASSIFICATION:
-                        loss = loss_fn(output_pred.float(), batch[entity_table].y.long())
+                        task_loss = loss_fn(output_pred.float(), batch[entity_table].y.long())
                     else:
-                        loss = loss_fn(output_pred.float(), batch[entity_table].y.float())
+                        task_loss = loss_fn(output_pred.float(), batch[entity_table].y.float())
+                    loss = task_loss + align_loss
                 else:
-                    loss = model(batch, task.entity_table)
+                    task_loss = model(batch, task.entity_table)
+                    align_loss = model_for_io.latest_align_loss
+                    loss = task_loss + align_loss
                 loss.backward()
                 optimizer.step()
 
@@ -765,7 +796,16 @@ def main() -> None:
                 interval_loss_accum += loss.detach().item() * nums_samples
                 interval_count_accum += nums_samples
                 train_loss = loss_accum / max(count_accum, 1)
-                summary = {"loss": train_loss, "lr": optimizer.param_groups[-1]["lr"]}
+                summary = {
+                    "loss": train_loss,
+                    "task_loss": float(task_loss.detach().item()),
+                    "align_loss": float(align_loss.detach().item()) if torch.is_tensor(align_loss) else float(align_loss),
+                    "lr": optimizer.param_groups[-1]["lr"],
+                }
+                if getattr(model_for_io, "basis_enabled", False):
+                    summary["align_token_bce"] = model_for_io.latest_align_components["token_bce"]
+                    summary["align_graph_bce"] = model_for_io.latest_align_components["graph_bce"]
+                    summary["align_entropy"] = model_for_io.latest_align_components["entropy"]
                 if run is not None:
                     for k, v in summary.items():
                         run.log({f"train/{k}": v}, step=steps)
