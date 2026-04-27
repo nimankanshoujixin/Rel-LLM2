@@ -734,7 +734,6 @@ class Model(torch.nn.Module):
         x_dict = self.gnn(x_dict, batch.edge_index_dict)  # interactions among different tables
         node_embed = x_dict[entity_table][:batch_size]
         if self.model is None: return self.head(node_embed)  # output prediction
-        node_embed = self.projector(node_embed)
 
         # encode description, questions and labels   # TODO: pad at last/in the middle? pad id to like 0006086 of the same length?
         task_desc = get_task_description(self.dataset, self.task)
