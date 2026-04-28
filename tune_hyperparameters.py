@@ -151,6 +151,12 @@ def parse_args() -> argparse.Namespace:
         help="Fixed residual injection scale. If omitted, tune it with Optuna.",
     )
     parser.add_argument(
+        "--basis-graph-alpha",
+        type=float,
+        default=None,
+        help="Fixed global graph residual scale. If omitted, tune it with Optuna.",
+    )
+    parser.add_argument(
         "--basis-lambda-tok",
         type=float,
         default=None,
@@ -286,6 +292,7 @@ def build_main_command(
         f"--basis_root={args.basis_root}",
         f"--basis_tau={params['basis_tau']}",
         f"--basis_residual_alpha={params['basis_residual_alpha']}",
+        f"--basis_graph_alpha={params['basis_graph_alpha']}",
         f"--basis_lambda_tok={params['basis_lambda_tok']}",
         f"--basis_lambda_g={params['basis_lambda_g']}",
         f"--basis_lambda_sharp={params['basis_lambda_sharp']}",
@@ -354,6 +361,11 @@ def build_trial_command(args: argparse.Namespace, trial: optuna.Trial) -> tuple[
             args.basis_residual_alpha
             if args.basis_residual_alpha is not None
             else trial.suggest_float("basis_residual_alpha", 0.05, 0.5)
+        ),
+        "basis_graph_alpha": (
+            args.basis_graph_alpha
+            if args.basis_graph_alpha is not None
+            else trial.suggest_float("basis_graph_alpha", 0.0, 0.25)
         ),
         "basis_tau": (
             args.basis_tau

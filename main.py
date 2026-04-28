@@ -490,6 +490,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--disable_basis_token_head", action="store_true")
     parser.add_argument("--basis_tau", type=float, default=0.07)
     parser.add_argument("--basis_residual_alpha", type=float, default=0.1)
+    parser.add_argument("--basis_graph_alpha", type=float, default=0.05)
     parser.add_argument("--basis_lambda_tok", type=float, default=1.0)
     parser.add_argument("--basis_lambda_g", type=float, default=1.0)
     parser.add_argument("--basis_lambda_sharp", type=float, default=0.01)
@@ -612,6 +613,7 @@ def main() -> None:
             basis_artifact=basis_artifact,
             basis_tau=args.basis_tau,
             basis_residual_alpha=args.basis_residual_alpha,
+            basis_graph_alpha=args.basis_graph_alpha,
             basis_lambda_tok=args.basis_lambda_tok,
             basis_lambda_g=args.basis_lambda_g,
             basis_lambda_sharp=args.basis_lambda_sharp,

@@ -58,7 +58,7 @@ class Model(torch.nn.Module):
                  id_awareness: bool = False, model_type: str = "meta-llama/Llama-3.2-1B", max_new_tokens=1, llm_frozen=False, output_mlp=False, output_probs=True, num_demo=4,
                  dataset=None, task=None, gamma=2.0, alpha=[1.0, 1.0], mask_ratio=0.5, pretrain_random_table=False, pretrain_mask_cell=True, device: torch.device | None = None,
                  basis_artifact: Dict[str, Any] | None = None, basis_tau: float = 0.07, basis_residual_alpha: float = 0.1,
-                 basis_lambda_tok: float = 1.0, basis_lambda_g: float = 1.0, basis_lambda_sharp: float = 0.01):
+                 basis_graph_alpha: float = 0.05, basis_lambda_tok: float = 1.0, basis_lambda_g: float = 1.0, basis_lambda_sharp: float = 0.01):
         super().__init__()
         self.encoder = HeteroEncoder(channels=channels, node_to_col_names_dict={node_type: data[node_type].tf.col_names_dict for node_type in data.node_types},
                                      node_to_col_stats=col_stats_dict, )
@@ -85,6 +85,7 @@ class Model(torch.nn.Module):
         self.basis_enabled = False
         self.basis_tau = basis_tau
         self.basis_residual_alpha = basis_residual_alpha
+        self.basis_graph_alpha = basis_graph_alpha
         self.basis_lambda_tok = basis_lambda_tok
         self.basis_lambda_g = basis_lambda_g
         self.basis_lambda_sharp = basis_lambda_sharp
@@ -202,6 +203,10 @@ class Model(torch.nn.Module):
                 self.regression_head.reset_parameters()
             if hasattr(self, "basis_query_norm"):
                 self.basis_query_norm.reset_parameters()
+            if hasattr(self, "basis_token_query_proj"):
+                initialize_weights(self.basis_token_query_proj)
+            if hasattr(self, "basis_graph_query_proj"):
+                initialize_weights(self.basis_graph_query_proj)
 
     def _init_basis_alignment(self, basis_artifact: Dict[str, Any], out_dim: int) -> None:
         basis_vectors = basis_artifact["A_db"].to(dtype=torch.float32)
@@ -221,6 +226,8 @@ class Model(torch.nn.Module):
             self.basis_indices_by_join_pair,
         ) = self._build_basis_index_maps(self.basis_ids)
         self.basis_query_norm = LayerNorm(out_dim).to(self.model_device)
+        self.basis_token_query_proj = Linear(out_dim, out_dim, bias=False).to(self.model_device)
+        self.basis_graph_query_proj = Linear(out_dim, out_dim, bias=False).to(self.model_device)
         self.basis_enabled = True
 
     @staticmethod
@@ -668,6 +675,16 @@ class Model(torch.nn.Module):
         graph_target = token_targets.max(dim=0).values
         return token_targets, token_mask, graph_target
 
+    def _encode_basis_query(self, x: Tensor, *, graph_level: bool) -> Tensor:
+        normalized = self.basis_query_norm(
+            x.to(
+                device=next(self.basis_query_norm.parameters()).device,
+                dtype=next(self.basis_query_norm.parameters()).dtype,
+            )
+        )
+        proj = self.basis_graph_query_proj if graph_level else self.basis_token_query_proj
+        return F.normalize(proj(normalized).float(), dim=-1)
+
     def align_token_prompts(
         self,
         graph_prompts: list[Tensor],
@@ -686,14 +703,8 @@ class Model(torch.nn.Module):
         aligned_prompts: list[Tensor] = []
 
         for prompt, token_meta in zip(graph_prompts, token_meta_batch):
-            prompt_for_query = self.basis_query_norm(
-                prompt.to(
-                    device=next(self.basis_query_norm.parameters()).device,
-                    dtype=next(self.basis_query_norm.parameters()).dtype,
-                )
-            ).float()
-            prompt_norm = F.normalize(prompt_for_query, dim=-1)
-            logits_token = torch.matmul(prompt_norm, self.basis_norm.t()) / self.basis_tau
+            prompt_query = self._encode_basis_query(prompt, graph_level=False)
+            logits_token = torch.matmul(prompt_query, self.basis_norm.t()) / self.basis_tau
             token_targets, token_mask, graph_target = self._build_token_basis_targets(
                 entity_table,
                 token_meta,
@@ -702,25 +713,24 @@ class Model(torch.nn.Module):
             masked_logits = logits_token.masked_fill(~token_mask, -1e4)
             p_token = sparsemax(masked_logits, dim=-1)
             r_token = torch.matmul(p_token, self.basis_vectors)
+
+            graph_seed = prompt.mean(dim=0, keepdim=True)
+            graph_query = self._encode_basis_query(graph_seed, graph_level=True)
+            logits_graph = torch.matmul(graph_query, self.basis_norm.t()) / self.basis_tau
+            p_graph = sparsemax(logits_graph, dim=-1)
+            r_graph = torch.matmul(p_graph, self.basis_vectors).expand_as(r_token)
+
             beta = float(min(max(self.basis_residual_alpha, 0.0), 1.0))
+            graph_alpha = float(max(self.basis_graph_alpha, 0.0))
             aligned_prompt = (1.0 - beta) * prompt + beta * r_token.to(
                 device=prompt.device,
                 dtype=prompt.dtype,
-            )
+            ) + graph_alpha * r_graph.to(device=prompt.device, dtype=prompt.dtype)
             aligned_prompts.append(aligned_prompt)
 
             token_bce = F.binary_cross_entropy_with_logits(masked_logits, token_targets)
             entropy = -(p_token * torch.log(p_token.clamp_min(1e-12))).sum(dim=-1).mean()
 
-            graph_repr = aligned_prompt.mean(dim=0, keepdim=True)
-            graph_repr = self.basis_query_norm(
-                graph_repr.to(
-                    device=next(self.basis_query_norm.parameters()).device,
-                    dtype=next(self.basis_query_norm.parameters()).dtype,
-                )
-            ).float()
-            graph_repr = F.normalize(graph_repr, dim=-1)
-            logits_graph = torch.matmul(graph_repr, self.basis_norm.t()) / self.basis_tau
             graph_bce = F.binary_cross_entropy_with_logits(logits_graph.squeeze(0), graph_target)
 
             align_loss = (
