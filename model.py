@@ -32,6 +32,25 @@ IGNORE_INDEX = -100  # default = -100 in Pytorch CrossEntropyLoss, https://githu
 accept_stypes = [stype.numerical, stype.categorical, stype.text_tokenized, stype.multicategorical, stype.text_embedded]   # no timestamp
 
 
+def sparsemax(logits: Tensor, dim: int = -1) -> Tensor:
+    logits = logits - logits.max(dim=dim, keepdim=True).values
+    zs = torch.sort(logits, dim=dim, descending=True).values
+    range_tensor = torch.arange(
+        1,
+        zs.size(dim) + 1,
+        device=logits.device,
+        dtype=logits.dtype,
+    )
+    view_shape = [1] * logits.dim()
+    view_shape[dim] = -1
+    range_tensor = range_tensor.view(view_shape)
+    cumulative = zs.cumsum(dim)
+    support = 1 + range_tensor * zs > cumulative
+    k = support.sum(dim=dim, keepdim=True).clamp_min(1)
+    tau = (cumulative.gather(dim, k.long() - 1) - 1) / k.to(logits.dtype)
+    return torch.clamp(logits - tau, min=0.0)
+
+
 class Model(torch.nn.Module):
 
     def __init__(self, data: HeteroData, col_stats_dict: Dict[str, Dict[str, Dict[StatType, Any]]], num_layers: int, channels: int, out_channels: int, aggr: str,
@@ -681,10 +700,10 @@ class Model(torch.nn.Module):
                 logits_token.device,
             )
             masked_logits = logits_token.masked_fill(~token_mask, -1e4)
-            p_token = torch.softmax(masked_logits, dim=-1)
+            p_token = sparsemax(masked_logits, dim=-1)
             r_token = torch.matmul(p_token, self.basis_vectors)
-
-            aligned_prompt = prompt + self.basis_residual_alpha * r_token.to(
+            beta = float(min(max(self.basis_residual_alpha, 0.0), 1.0))
+            aligned_prompt = (1.0 - beta) * prompt + beta * r_token.to(
                 device=prompt.device,
                 dtype=prompt.dtype,
             )

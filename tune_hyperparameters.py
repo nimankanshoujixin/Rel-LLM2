@@ -141,8 +141,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--basis-tau",
         type=float,
-        default=0.07,
-        help="Temperature used for token-to-basis logits.",
+        default=None,
+        help="Fixed temperature used for token-to-basis logits. If omitted, tune it with Optuna.",
     )
     parser.add_argument(
         "--basis-residual-alpha",
@@ -284,7 +284,7 @@ def build_main_command(
         f"--wd={params['wd']}",
         f"--seed={args.seed}",
         f"--basis_root={args.basis_root}",
-        f"--basis_tau={args.basis_tau}",
+        f"--basis_tau={params['basis_tau']}",
         f"--basis_residual_alpha={params['basis_residual_alpha']}",
         f"--basis_lambda_tok={params['basis_lambda_tok']}",
         f"--basis_lambda_g={params['basis_lambda_g']}",
@@ -353,7 +353,12 @@ def build_trial_command(args: argparse.Namespace, trial: optuna.Trial) -> tuple[
         "basis_residual_alpha": (
             args.basis_residual_alpha
             if args.basis_residual_alpha is not None
-            else trial.suggest_float("basis_residual_alpha", 0.02, 0.3)
+            else trial.suggest_float("basis_residual_alpha", 0.05, 0.5)
+        ),
+        "basis_tau": (
+            args.basis_tau
+            if args.basis_tau is not None
+            else trial.suggest_float("basis_tau", 0.03, 0.2, log=True)
         ),
         "basis_lambda_tok": (
             args.basis_lambda_tok
