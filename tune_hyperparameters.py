@@ -121,6 +121,60 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--cache-dir", type=str, default=None)
     parser.add_argument("--text-embedder-path", type=str, default=None)
     parser.add_argument(
+        "--basis-root",
+        type=str,
+        default="artifacts/basis",
+        help="Root directory for per-dataset basis artifacts.",
+    )
+    parser.add_argument(
+        "--basis-artifact",
+        type=str,
+        default=None,
+        help="Explicit basis artifact path. Overrides --basis-root when set.",
+    )
+    parser.add_argument(
+        "--disable-basis-token-head",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help="Disable the impl-b basis token alignment head.",
+    )
+    parser.add_argument(
+        "--basis-tau",
+        type=float,
+        default=None,
+        help="Fixed temperature used for token-to-basis logits. If omitted, tune it with Optuna.",
+    )
+    parser.add_argument(
+        "--basis-residual-alpha",
+        type=float,
+        default=None,
+        help="Fixed residual injection scale. If omitted, tune it with Optuna.",
+    )
+    parser.add_argument(
+        "--basis-graph-alpha",
+        type=float,
+        default=None,
+        help="Fixed global graph residual scale. If omitted, tune it with Optuna.",
+    )
+    parser.add_argument(
+        "--basis-lambda-tok",
+        type=float,
+        default=None,
+        help="Fixed token-level BCE alignment weight. If omitted, tune it with Optuna.",
+    )
+    parser.add_argument(
+        "--basis-lambda-g",
+        type=float,
+        default=None,
+        help="Fixed graph-level BCE alignment weight. If omitted, tune it with Optuna.",
+    )
+    parser.add_argument(
+        "--basis-lambda-sharp",
+        type=float,
+        default=None,
+        help="Fixed entropy sharpening weight. If omitted, tune it with Optuna.",
+    )
+    parser.add_argument(
         "--workdir",
         type=str,
         default=str(Path(__file__).resolve().parent),
@@ -235,6 +289,13 @@ def build_main_command(
         f"--lr={params['lr']}",
         f"--wd={params['wd']}",
         f"--seed={args.seed}",
+        f"--basis_root={args.basis_root}",
+        f"--basis_tau={params['basis_tau']}",
+        f"--basis_residual_alpha={params['basis_residual_alpha']}",
+        f"--basis_graph_alpha={params['basis_graph_alpha']}",
+        f"--basis_lambda_tok={params['basis_lambda_tok']}",
+        f"--basis_lambda_g={params['basis_lambda_g']}",
+        f"--basis_lambda_sharp={params['basis_lambda_sharp']}",
         "--loss_class_weight",
         "1.0",
         str(params["w_pos"]),
@@ -256,6 +317,10 @@ def build_main_command(
         command.append(f"--cache_dir={args.cache_dir}")
     if args.text_embedder_path:
         command.append(f"--text_embedder_path={args.text_embedder_path}")
+    if args.basis_artifact:
+        command.append(f"--basis_artifact={args.basis_artifact}")
+    if args.disable_basis_token_head:
+        command.append("--disable_basis_token_head")
     if args.llm_frozen:
         command.append("--llm_frozen")
     if args.output_mlp:
@@ -292,6 +357,36 @@ def build_trial_command(args: argparse.Namespace, trial: optuna.Trial) -> tuple[
         ),
         "batch_size": trial.suggest_categorical("batch_size", batch_size_choices),
         "w_pos": trial.suggest_float("w_pos", 0.5, 3.0),
+        "basis_residual_alpha": (
+            args.basis_residual_alpha
+            if args.basis_residual_alpha is not None
+            else trial.suggest_float("basis_residual_alpha", 0.05, 0.5)
+        ),
+        "basis_graph_alpha": (
+            args.basis_graph_alpha
+            if args.basis_graph_alpha is not None
+            else trial.suggest_float("basis_graph_alpha", 0.0, 0.25)
+        ),
+        "basis_tau": (
+            args.basis_tau
+            if args.basis_tau is not None
+            else trial.suggest_float("basis_tau", 0.03, 0.2, log=True)
+        ),
+        "basis_lambda_tok": (
+            args.basis_lambda_tok
+            if args.basis_lambda_tok is not None
+            else trial.suggest_float("basis_lambda_tok", 0.1, 3.0, log=True)
+        ),
+        "basis_lambda_g": (
+            args.basis_lambda_g
+            if args.basis_lambda_g is not None
+            else trial.suggest_float("basis_lambda_g", 0.1, 3.0, log=True)
+        ),
+        "basis_lambda_sharp": (
+            args.basis_lambda_sharp
+            if args.basis_lambda_sharp is not None
+            else trial.suggest_float("basis_lambda_sharp", 1e-4, 1e-1, log=True)
+        ),
     }
     return build_main_command(args, params, skip_test=True), params
 
