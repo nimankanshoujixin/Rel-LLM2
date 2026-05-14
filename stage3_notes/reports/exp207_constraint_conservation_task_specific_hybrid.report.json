@@ -1,0 +1,129 @@
+{
+  "candidate": "stage3_notes\\candidates\\exp207_constraint_conservation_task_specific_hybrid.json",
+  "tasks": {
+    "user-churn": {
+      "run_id": "EXP207",
+      "log_path": "stage3_notes\\reports\\log_cache\\stage3-exp207.log",
+      "metrics": {
+        "average_precision": 0.7074067292599105,
+        "accuracy": 0.669921875,
+        "f1": 0.7636363636363637,
+        "roc_auc": 0.6663509239488176
+      },
+      "comparison": {
+        "primary_metric": "roc_auc",
+        "current": 0.6663509239488176,
+        "baseline": 0.6540209032382359,
+        "signed_gain": 0.012330020710581646,
+        "delta_threshold": 0.001,
+        "noise_floor_delta": 0.002552699600237518,
+        "effective_delta_threshold": 0.002552699600237518,
+        "verdict": "better"
+      },
+      "screening_comparison": {
+        "primary_metric": "roc_auc",
+        "current": 0.6663509239488176,
+        "baseline": 0.6540209032382359,
+        "signed_gain": 0.012330020710581646,
+        "delta_threshold": 0.001,
+        "noise_floor_delta": 0.002552699600237518,
+        "effective_delta_threshold": 0.002552699600237518,
+        "verdict": "better"
+      },
+      "reference_comparison": {
+        "primary_metric": "roc_auc",
+        "current": 0.6663509239488176,
+        "baseline": 0.6918065868366201,
+        "signed_gain": -0.025455662887802544,
+        "verdict": "worse"
+      },
+      "advancement_assessment": {
+        "recommendation": "drop",
+        "reason": "current task evidence does not justify an Optuna-plus-full-test continuation."
+      }
+    },
+    "user-ltv": {
+      "run_id": "EXP208",
+      "log_path": "stage3_notes\\reports\\log_cache\\stage3-exp208.log",
+      "metrics": {
+        "r2": -0.17941659564225332,
+        "mae": 79.51790131831658,
+        "rmse": 137.5746899166952
+      },
+      "comparison": {
+        "primary_metric": "mae",
+        "current": 79.51790131831658,
+        "baseline": 79.27257269903086,
+        "signed_gain": -0.24532861928571492,
+        "delta_threshold": 0.001,
+        "noise_floor_delta": 6.511244718243262,
+        "effective_delta_threshold": 6.511244718243262,
+        "verdict": "neutral"
+      },
+      "screening_comparison": {
+        "primary_metric": "mae",
+        "current": 79.51790131831658,
+        "baseline": 79.27257269903086,
+        "signed_gain": -0.24532861928571492,
+        "delta_threshold": 0.001,
+        "noise_floor_delta": 6.511244718243262,
+        "effective_delta_threshold": 6.511244718243262,
+        "verdict": "neutral"
+      },
+      "reference_comparison": {
+        "primary_metric": "mae",
+        "current": 79.51790131831658,
+        "baseline": 16.671180345060154,
+        "signed_gain": -62.846720973256424,
+        "verdict": "worse"
+      },
+      "advancement_assessment": {
+        "recommendation": "retune_plausible",
+        "reason": "for user-ltv the screen metric scale is a reliable task-local gate even though its absolute magnitude differs sharply from full test, so non-regression on screen remains worth Optuna plus final full-test confirmation"
+      }
+    },
+    "item-incoterms": {
+      "run_id": "EXP209",
+      "log_path": "stage3_notes\\reports\\log_cache\\stage3-exp209.log",
+      "metrics": {
+        "accuracy": 0.69921875,
+        "macro_f1": 0.09144316730523627,
+        "micro_f1": 0.69921875,
+        "mrr": 0.7937755766369047
+      },
+      "comparison": {
+        "primary_metric": "mrr",
+        "current": 0.7937755766369047,
+        "baseline": 0.8147880873466811,
+        "signed_gain": -0.02101251070977639,
+        "delta_threshold": 0.001,
+        "noise_floor_delta": 0.013037038915945098,
+        "effective_delta_threshold": 0.013037038915945098,
+        "verdict": "worse"
+      },
+      "screening_comparison": {
+        "primary_metric": "mrr",
+        "current": 0.7937755766369047,
+        "baseline": 0.8147880873466811,
+        "signed_gain": -0.02101251070977639,
+        "delta_threshold": 0.001,
+        "noise_floor_delta": 0.013037038915945098,
+        "effective_delta_threshold": 0.013037038915945098,
+        "verdict": "worse"
+      },
+      "reference_comparison": {
+        "primary_metric": "mrr",
+        "current": 0.7937755766369047,
+        "baseline": 0.7043105782857789,
+        "signed_gain": 0.08946499835112576,
+        "verdict": "better"
+      },
+      "advancement_assessment": {
+        "recommendation": "promote",
+        "reason": "full-test reference is already beaten on the task primary metric."
+      }
+    }
+  },
+  "global_verdict": "failed",
+  "candidate_status": "retune_plausible"
+}

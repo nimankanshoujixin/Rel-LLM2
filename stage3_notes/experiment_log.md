@@ -932,6 +932,73 @@
     Phase 2 best hyperparameters
   - keep Optuna and final full test separate from that screen
 
+## EXP207 task-specific hybrid completion
+
+- Date: 2026-05-15
+- Branch: `codex/stage3-clean-p13`
+- Target component: Part 3 task-specific hybrid follow-up
+- Candidate/report artifacts:
+  - candidate:
+    `stage3_notes/candidates/exp207_constraint_conservation_task_specific_hybrid.json`
+  - official report:
+    `stage3_notes/reports/exp207_constraint_conservation_task_specific_hybrid.report.json`
+  - log cache:
+    - `stage3_notes/reports/log_cache/stage3-exp207.log`
+    - `stage3_notes/reports/log_cache/stage3-exp208.log`
+    - `stage3_notes/reports/log_cache/stage3-exp209.log`
+- Remote completion state:
+  - tmux session `lymtmux` returned to only `0:bash`
+  - no live `main.py`, `torch.distributed.run`, or `tune_hyperparameters.py` chain remained
+  - all GPUs were idle again after the bundle finished
+- Final judged screening metrics:
+  - `EXP207` / `user-churn`:
+    - `average_precision=0.7074067292599105`
+    - `accuracy=0.669921875`
+    - `f1=0.7636363636363637`
+    - `roc_auc=0.6663509239488176`
+  - `EXP208` / `user-ltv`:
+    - `r2=-0.17941659564225332`
+    - `mae=79.51790131831658`
+    - `rmse=137.5746899166952`
+  - `EXP209` / `item-incoterms`:
+    - `accuracy=0.69921875`
+    - `macro_f1=0.09144316730523627`
+    - `micro_f1=0.69921875`
+    - `mrr=0.7937755766369047`
+- Throughput reading from the finished logs:
+  - `EXP207` / `user-churn`:
+    - visible subset/test throughput about `25.7-26.3 it/s`
+    - with per-rank `batch_size=3` on one GPU, about `77.1-78.9 items/sec/GPU`
+  - `EXP208` / `user-ltv`:
+    - visible subset/test throughput about `21.4-22.1 it/s`
+    - with per-rank `batch_size=2` on one GPU, about `42.8-44.2 items/sec/GPU`
+  - `EXP209` / `item-incoterms`:
+    - visible subset/test throughput about `18.0-18.2 it/s`
+    - with per-rank `batch_size=4` on one GPU, about `72.0-72.8 items/sec/GPU`
+- Bundle-level judgment:
+  - global verdict `failed`
+  - candidate status `retune_plausible`
+- Interpretation:
+  - `user-churn` is now screening `better`, which makes `EXP207` the strongest Amazon-side Part 3
+    follow-up seen so far, even though it still trails the stored full-test reference by about
+    `0.0255` ROC-AUC
+  - `user-ltv` stayed screening `neutral`, which keeps its task-local continuation signal alive
+    under the documented subset/full-test mismatch rule
+  - `item-incoterms` again stayed reference-positive while remaining below the optimistic subset
+    baseline, so the salt-side Part 3 signal still looks robust but not subset-dominant
+- Program consequence:
+  - do not treat `EXP207` as a finished bundle winner and do not jump directly to final full test
+  - also do not go back to another blind screening rebundle immediately
+  - the next justified step is limited Part 3 task-specific Optuna on the hybrid Amazon settings,
+    keeping Optuna and later full test separate
+- Immediate implementation blocker uncovered by that next step:
+  - `tune_hyperparameters.py` did not yet expose the Part 3 hybrid gate controls
+    `basis_gate_strategy`, `basis_gate_token_floor`, and `basis_gate_graph_floor`
+  - that would prevent a user-churn Part 3 Optuna launch from faithfully reproducing the actual
+    `EXP207` mechanism path
+  - therefore the current foreground action is to patch that tuning interface first, validate it,
+    then decide and launch the next bounded Optuna wave from the clean worktree
+
 ### EXP-195 / EXP-196 / EXP-197
 
 - Date: 2026-05-15

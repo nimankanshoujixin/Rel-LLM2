@@ -249,6 +249,25 @@ def parse_args() -> argparse.Namespace:
         help="Fixed branch orthogonality regularization weight.",
     )
     parser.add_argument(
+        "--basis-gate-strategy",
+        type=str,
+        default="none",
+        choices=["none", "confidence"],
+        help="Fixed conservative transfer gate strategy.",
+    )
+    parser.add_argument(
+        "--basis-gate-token-floor",
+        type=float,
+        default=0.0,
+        help="Fixed token-confidence gate floor.",
+    )
+    parser.add_argument(
+        "--basis-gate-graph-floor",
+        type=float,
+        default=0.0,
+        help="Fixed graph-confidence gate floor.",
+    )
+    parser.add_argument(
         "--basis-assignment-topk",
         type=int,
         default=0,
@@ -426,6 +445,9 @@ def build_main_command(
         f"--basis_lambda_entity_identity={args.basis_lambda_entity_identity}",
         f"--basis_entity_identity_temperature={args.basis_entity_identity_temperature}",
         f"--basis_lambda_branch_orth={args.basis_lambda_branch_orth}",
+        f"--basis_gate_strategy={args.basis_gate_strategy}",
+        f"--basis_gate_token_floor={args.basis_gate_token_floor}",
+        f"--basis_gate_graph_floor={args.basis_gate_graph_floor}",
         f"--basis_assignment_topk={args.basis_assignment_topk}",
         "--loss_class_weight",
         "1.0",

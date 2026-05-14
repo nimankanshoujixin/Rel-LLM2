@@ -322,3 +322,70 @@ task-specific hybrid follow-up:
 That follow-up is the cleanest next continuation because it directly tests the newest evidence from
 `EXP201` plus `EXP204`: the useful Part 3 signal may be task-selective across the two Amazon
 representative tasks, not only between Amazon and salt.
+
+## Sixth task-specific hybrid outcome
+
+The task-specific hybrid follow-up has now completed as:
+
+- `EXP207` / `user-churn`
+- `EXP208` / `user-ltv`
+- `EXP209` / `item-incoterms`
+
+Outcome summary:
+
+- official report:
+  - `stage3_notes/reports/exp207_constraint_conservation_task_specific_hybrid.report.json`
+- bundle verdict:
+  - `failed`
+- candidate status:
+  - `retune_plausible`
+- throughput reading from the finished logs:
+  - `EXP207` / `user-churn`
+    - visible subset/test throughput about `25.7-26.3 it/s`
+    - with per-rank `batch_size=3` on one GPU, about `77.1-78.9 items/sec/GPU`
+  - `EXP208` / `user-ltv`
+    - visible subset/test throughput about `21.4-22.1 it/s`
+    - with per-rank `batch_size=2` on one GPU, about `42.8-44.2 items/sec/GPU`
+  - `EXP209` / `item-incoterms`
+    - visible subset/test throughput about `18.0-18.2 it/s`
+    - with per-rank `batch_size=4` on one GPU, about `72.0-72.8 items/sec/GPU`
+- task reading:
+  - `user-churn`
+    - final judged test metric `roc_auc=0.6663509239488176`
+    - this is the first Part 3 follow-up in this family to move `user-churn` to screening
+      `better`
+    - it still remains below the stored full-test reference `0.6918065868366201`, but the gap is
+      now much smaller than in the earlier Part 3 variants
+  - `user-ltv`
+    - final judged test metric `mae=79.51790131831658`
+    - this stays screening `neutral`
+    - under the user-ltv screen/full-test mismatch rule that remains live enough for a limited
+      task-specific retune
+  - `item-incoterms`
+    - final judged test metric `mrr=0.7937755766369047`
+    - this still sits below the optimistic subset baseline `0.8147880873466811`
+    - but again clearly above the stored full-test reference `0.7043105782857789`
+
+Program consequence:
+
+- the automatic bundle verdict is still `failed`, so `EXP207` should not jump directly to final
+  full test as a whole-bundle winner
+- however, this is now the strongest Part 3 screening evidence in the family:
+  - `user-churn` improved to screening `better`
+  - `user-ltv` held screening `neutral`
+  - `item-incoterms` kept the same strong salt-side reference-positive signal
+- therefore the next justified continuation is no longer another blind screening rebundle
+- instead, the next step should be limited Part 3 task-specific Optuna on the active Amazon-side
+  hybrid settings, while keeping Optuna and later final full test separate
+
+## Immediate Optuna preparation consequence
+
+To support that next step cleanly, `tune_hyperparameters.py` now needs to express the same fixed
+Part 3 hybrid gate controls used by `EXP207`, especially:
+
+- `basis_gate_strategy`
+- `basis_gate_token_floor`
+- `basis_gate_graph_floor`
+
+Without that interface support, a user-churn Part 3 Optuna launch would silently fail to reproduce
+the actual hybrid screening path.
