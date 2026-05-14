@@ -181,3 +181,62 @@ Immediate program consequence:
   fixed hyperparameters
 - only after that fixed-hyperparameter Part 3 screening wave should the program decide whether to
   invest in a separate Optuna phase
+
+## Part 3 screening result on 2026-05-15
+
+That first fair fixed-hyperparameter Part 3 screening wave is now complete under candidate
+`exp195_constraint_conservation_transfer`.
+
+Result:
+
+- official bundle verdict:
+  - `failed`
+- bundle continuation decision:
+  - do **not** run Optuna for this exact integrated Part 3 bundle
+
+Task-aware reading:
+
+- `user-churn`
+  - regressed below the screening baseline and remained far below the full-test reference
+- `user-ltv`
+  - regressed below the screening baseline beyond the current noise-aware threshold
+- `item-incoterms`
+  - remained below the optimistic screening baseline
+  - but still beat the stored full-test reference band comfortably, which means the salt-side
+    mechanism signal is real enough to preserve as search-space evidence
+
+Search-space consequence:
+
+- treat the current coarse constraint-conservation integration as too aggressive for the Amazon
+  tasks
+- preserve the finding that the salt-side task can benefit materially from this family
+- next action is not bundle-level Optuna, but a narrower follow-up Part 3 design that keeps the
+  useful `item-incoterms` signal while softening or gating the transfer path for Amazon-side tasks
+
+## Narrowed Part 3 follow-up on 2026-05-15
+
+The next concrete follow-up is now registered as
+`exp198_constraint_conservation_gated_amazon_transfer`.
+
+Its design choice is intentionally narrow:
+
+- keep the same validated Part 1 base and the same task-specific Phase 2 best settings
+- keep the salt-side `item-incoterms` transfer close to the first Part 3 pass
+- do not promote the failed `EXP195` bundle into Optuna
+- instead, soften only the Amazon-side transfer path before spending more search budget
+
+Mechanism-level change for this follow-up:
+
+- `user-churn` and `user-ltv` now use explicit confidence gating
+- Amazon-side `basis_residual_alpha` and `basis_graph_alpha` are reduced
+- Amazon-side post-alignment retention and extra orthogonality pressure are reduced or removed
+- `item-incoterms` keeps the stronger ungated conservation path so the useful salt-side signal is
+  not accidentally erased before re-screening
+
+Program consequence:
+
+- this remains a screening-only bundle
+- if the narrowed bundle still fails, the next move should likely be a deeper mechanism split
+  rather than immediate Optuna
+- if the narrowed bundle becomes non-regressive enough under the normal task-aware gate, only then
+  should it advance to separate Optuna and later separate full test

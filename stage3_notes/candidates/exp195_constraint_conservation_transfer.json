@@ -5,7 +5,7 @@
   "family": "representation_alignment",
   "source_type": "paper+ablation",
   "launch_mode": "parallel",
-  "status": "ready_for_screening",
+  "status": "failed",
   "task_run_ids": {
     "user-churn": "EXP195",
     "user-ltv": "EXP196",
@@ -138,5 +138,25 @@
     "The first comparison wave must keep the current task-specific Phase 2 best settings fixed so the comparison is mechanism-level rather than tuning-level.",
     "Because batch_size is per-rank, later launch preparation should preserve the intended per-rank batch semantics when comparing against the prior 2-rank best-setting runs.",
     "Scientific interpretation still follows the same Stage 3 rules: subset metrics are continuation gates, user-ltv subset/full-test scale mismatch still applies, and item-incoterms should still be judged scientifically against the full-test reference band near 0.70 rather than the optimistic subset regime."
-  ]
+  ],
+  "task_launches": {
+    "user-churn": {
+      "target": "lab25211",
+      "gpu": 0,
+      "window_name": "stage3-exp195",
+      "baseline_default_gpu": 5
+    },
+    "user-ltv": {
+      "target": "lab25211",
+      "gpu": 1,
+      "window_name": "stage3-exp196",
+      "baseline_default_gpu": 6
+    },
+    "item-incoterms": {
+      "target": "lab25211",
+      "gpu": 2,
+      "window_name": "stage3-exp197",
+      "baseline_default_gpu": 7
+    }
+  }
 }

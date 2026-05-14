@@ -1,0 +1,129 @@
+{
+  "candidate": "stage3_notes\\candidates\\exp195_constraint_conservation_transfer.json",
+  "tasks": {
+    "user-churn": {
+      "run_id": "EXP195",
+      "log_path": "stage3_notes\\reports\\log_cache\\stage3-exp195.log",
+      "metrics": {
+        "average_precision": 0.6618083919884071,
+        "accuracy": 0.650390625,
+        "f1": 0.7754077791718946,
+        "roc_auc": 0.6280925393741872
+      },
+      "comparison": {
+        "primary_metric": "roc_auc",
+        "current": 0.6280925393741872,
+        "baseline": 0.6540209032382359,
+        "signed_gain": -0.02592836386404873,
+        "delta_threshold": 0.001,
+        "noise_floor_delta": 0.002552699600237518,
+        "effective_delta_threshold": 0.002552699600237518,
+        "verdict": "worse"
+      },
+      "screening_comparison": {
+        "primary_metric": "roc_auc",
+        "current": 0.6280925393741872,
+        "baseline": 0.6540209032382359,
+        "signed_gain": -0.02592836386404873,
+        "delta_threshold": 0.001,
+        "noise_floor_delta": 0.002552699600237518,
+        "effective_delta_threshold": 0.002552699600237518,
+        "verdict": "worse"
+      },
+      "reference_comparison": {
+        "primary_metric": "roc_auc",
+        "current": 0.6280925393741872,
+        "baseline": 0.6918065868366201,
+        "signed_gain": -0.06371404746243292,
+        "verdict": "worse"
+      },
+      "advancement_assessment": {
+        "recommendation": "drop",
+        "reason": "current task evidence does not justify an Optuna-plus-full-test continuation."
+      }
+    },
+    "user-ltv": {
+      "run_id": "EXP196",
+      "log_path": "stage3_notes\\reports\\log_cache\\stage3-exp196.log",
+      "metrics": {
+        "r2": -0.32019872532681104,
+        "mae": 86.30371976418479,
+        "rmse": 145.55414580864218
+      },
+      "comparison": {
+        "primary_metric": "mae",
+        "current": 86.30371976418479,
+        "baseline": 79.27257269903086,
+        "signed_gain": -7.031147065153931,
+        "delta_threshold": 0.001,
+        "noise_floor_delta": 6.511244718243262,
+        "effective_delta_threshold": 6.511244718243262,
+        "verdict": "worse"
+      },
+      "screening_comparison": {
+        "primary_metric": "mae",
+        "current": 86.30371976418479,
+        "baseline": 79.27257269903086,
+        "signed_gain": -7.031147065153931,
+        "delta_threshold": 0.001,
+        "noise_floor_delta": 6.511244718243262,
+        "effective_delta_threshold": 6.511244718243262,
+        "verdict": "worse"
+      },
+      "reference_comparison": {
+        "primary_metric": "mae",
+        "current": 86.30371976418479,
+        "baseline": 16.671180345060154,
+        "signed_gain": -69.63253941912464,
+        "verdict": "worse"
+      },
+      "advancement_assessment": {
+        "recommendation": "drop",
+        "reason": "current task evidence does not justify an Optuna-plus-full-test continuation."
+      }
+    },
+    "item-incoterms": {
+      "run_id": "EXP197",
+      "log_path": "stage3_notes\\reports\\log_cache\\stage3-exp197.log",
+      "metrics": {
+        "accuracy": 0.69921875,
+        "macro_f1": 0.09144316730523627,
+        "micro_f1": 0.69921875,
+        "mrr": 0.7937972780257936
+      },
+      "comparison": {
+        "primary_metric": "mrr",
+        "current": 0.7937972780257936,
+        "baseline": 0.8147880873466811,
+        "signed_gain": -0.020990809320887482,
+        "delta_threshold": 0.001,
+        "noise_floor_delta": 0.013037038915945098,
+        "effective_delta_threshold": 0.013037038915945098,
+        "verdict": "worse"
+      },
+      "screening_comparison": {
+        "primary_metric": "mrr",
+        "current": 0.7937972780257936,
+        "baseline": 0.8147880873466811,
+        "signed_gain": -0.020990809320887482,
+        "delta_threshold": 0.001,
+        "noise_floor_delta": 0.013037038915945098,
+        "effective_delta_threshold": 0.013037038915945098,
+        "verdict": "worse"
+      },
+      "reference_comparison": {
+        "primary_metric": "mrr",
+        "current": 0.7937972780257936,
+        "baseline": 0.7043105782857789,
+        "signed_gain": 0.08948669974001466,
+        "verdict": "better"
+      },
+      "advancement_assessment": {
+        "recommendation": "promote",
+        "reason": "full-test reference is already beaten on the task primary metric."
+      }
+    }
+  },
+  "global_verdict": "failed",
+  "candidate_status": "failed"
+}

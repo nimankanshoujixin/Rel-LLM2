@@ -1,0 +1,131 @@
+{
+  "bundle_id": "BUNDLE-198",
+  "slug": "constraint_conservation_gated_amazon_transfer",
+  "title": "Constraint conservation gated Amazon transfer",
+  "family": "representation_alignment",
+  "source_type": "ablation",
+  "launch_mode": "parallel",
+  "status": "ready_for_screening",
+  "task_run_ids": {
+    "user-churn": "EXP198",
+    "user-ltv": "EXP199",
+    "item-incoterms": "EXP200"
+  },
+  "literature": {
+    "queries": [
+      "confidence-gated graph representation transfer reduce negative transfer across domains",
+      "conservative transfer graph prompt alignment negative transfer gating",
+      "representation transfer confidence threshold structured prompt alignment"
+    ],
+    "papers": []
+  },
+  "evidence": {
+    "prior_experiments": [
+      "EXP192",
+      "EXP193",
+      "EXP194",
+      "EXP195",
+      "EXP196",
+      "EXP197"
+    ],
+    "why_now": "The first fair Part 3 screen preserved a meaningful salt-side gain but regressed both Amazon tasks. The next justified follow-up is therefore a narrower ablation of the same constraint-conservation path: keep the validated Part 1 base and the useful salt-side transfer, while explicitly softening Amazon-side transfer strength before spending Optuna budget."
+  },
+  "hypothesis": "If the first integrated constraint-conservation pass failed mainly because Amazon-side transfer was too permissive rather than because the family is intrinsically wrong, then adding confidence gating and lower transfer amplitudes on the Amazon tasks, while keeping the salt-side setting close to EXP195, should reduce over-transfer without discarding the useful conservation signal.",
+  "common_overrides": {
+    "basis_assignment_topk": 4,
+    "basis_entity_identity_temperature": 0.1
+  },
+  "task_overrides": {
+    "user-churn": {
+      "gnn_repr_artifact": "artifacts/gnn_repr/rel-amazon/gnn_repr.pt",
+      "channels": 256,
+      "num_layers": 2,
+      "num_neighbors": 16,
+      "aggr": "mean",
+      "temporal_strategy": "last",
+      "dropout": 0.4480456499617466,
+      "batch_size": 3,
+      "lr": 0.00021677846214357684,
+      "wd": 0.0016973078532467015,
+      "basis_residual_alpha": 0.12,
+      "basis_graph_alpha": 0.01,
+      "basis_tau": 0.037659918741014,
+      "basis_lambda_tok": 0.31528154175096096,
+      "basis_lambda_g": 2.470540427082327,
+      "basis_lambda_sharp": 0.0009324140221663494,
+      "basis_lambda_postalign_tok": 0.02,
+      "basis_lambda_entity_identity": 0.02,
+      "basis_lambda_branch_orth": 0.0,
+      "basis_gate_strategy": "confidence",
+      "basis_gate_token_floor": 0.35,
+      "basis_gate_graph_floor": 0.65,
+      "loss_class_weight": [
+        1.0,
+        1.7768682564439144
+      ]
+    },
+    "user-ltv": {
+      "gnn_repr_artifact": "artifacts/gnn_repr/rel-amazon/gnn_repr.pt",
+      "channels": 256,
+      "num_layers": 2,
+      "num_neighbors": 32,
+      "aggr": "mean",
+      "temporal_strategy": "last",
+      "dropout": 0.1792328642721363,
+      "batch_size": 2,
+      "lr": 0.0008138233922650508,
+      "wd": 1.9777828512462715e-06,
+      "basis_residual_alpha": 0.08,
+      "basis_graph_alpha": 0.0,
+      "basis_tau": 0.1160833330578411,
+      "basis_lambda_tok": 1.329755409073867,
+      "basis_lambda_g": 0.6746437142284308,
+      "basis_lambda_sharp": 0.020554245520150755,
+      "basis_lambda_postalign_tok": 0.01,
+      "basis_lambda_entity_identity": 0.02,
+      "basis_lambda_branch_orth": 0.0,
+      "basis_gate_strategy": "confidence",
+      "basis_gate_token_floor": 0.45,
+      "basis_gate_graph_floor": 0.75,
+      "loss_class_weight": [
+        1.0,
+        2.7180318564408164
+      ]
+    },
+    "item-incoterms": {
+      "gnn_repr_artifact": "artifacts/gnn_repr/rel-salt/gnn_repr.pt",
+      "channels": 256,
+      "num_layers": 2,
+      "num_neighbors": 32,
+      "aggr": "mean",
+      "temporal_strategy": "last",
+      "dropout": 0.4474136752138244,
+      "batch_size": 4,
+      "lr": 0.0008319514671870782,
+      "wd": 0.005727904470799624,
+      "basis_residual_alpha": 0.4229318791183682,
+      "basis_graph_alpha": 0.08918833167339732,
+      "basis_tau": 0.05111938883158829,
+      "basis_lambda_tok": 0.633326877532184,
+      "basis_lambda_g": 0.16149614799999182,
+      "basis_lambda_sharp": 0.025502980701628937,
+      "basis_lambda_postalign_tok": 0.1,
+      "basis_lambda_entity_identity": 0.05,
+      "basis_lambda_branch_orth": 0.02,
+      "basis_gate_strategy": "none",
+      "basis_gate_token_floor": 0.0,
+      "basis_gate_graph_floor": 0.0,
+      "loss_class_weight": [
+        1.0,
+        1.1783725794347397
+      ]
+    }
+  },
+  "notes": [
+    "This is a screening-only follow-up after EXP195 failed as a bundle but preserved meaningful salt-side signal.",
+    "The mechanism story stays the same; only the Amazon-side transfer is narrowed through explicit confidence gating and lower transfer amplitudes.",
+    "Do not run Optuna or final full test from this candidate directly.",
+    "The comparison remains fair at the task-hyperparameter level because the validated Phase 2 per-task best settings stay fixed and only the new Part 3 transfer strength is narrowed.",
+    "Scientific interpretation still follows the Stage 3 task-aware rule set: user-ltv subset/full-test scale mismatch still applies, and item-incoterms should still be judged scientifically against the stored full-test reference band rather than only the optimistic subset baseline."
+  ]
+}

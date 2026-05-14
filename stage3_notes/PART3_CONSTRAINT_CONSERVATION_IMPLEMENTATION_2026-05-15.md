@@ -77,3 +77,57 @@ Interpretation rule remains unchanged:
 3. run the first fixed-hyperparameter Part 3 screening wave
 4. only if that wave is promising, move on to separate Optuna
 5. only after Optuna selection, run separate final-test-only confirmation
+
+## First screening outcome
+
+The first fair fixed-hyperparameter screening wave has now completed as:
+
+- `EXP195` / `user-churn`
+- `EXP196` / `user-ltv`
+- `EXP197` / `item-incoterms`
+
+Outcome summary:
+
+- official report:
+  - `stage3_notes/reports/exp195_constraint_conservation_transfer.report.json`
+- bundle verdict:
+  - `failed`
+- task reading:
+  - `user-churn`
+    - final judged test metric `roc_auc=0.6280925393741872`
+    - worse than the screening baseline and worse than the full-test reference
+  - `user-ltv`
+    - final judged test metric `mae=86.30371976418479`
+    - worse than the screening baseline and worse than the full-test reference
+  - `item-incoterms`
+    - final judged test metric `mrr=0.7937972780257936`
+    - still below the optimistic screening baseline `0.8147880873466811`
+    - but clearly above the stored full-test reference `0.7043105782857789`
+
+Program consequence:
+
+- this first coarse integrated Part 3 pass should not advance directly to Optuna
+- the mechanism is not retired as pure noise, because the salt-side signal remains meaningful
+- but the current integrated transfer is too harmful on the Amazon tasks to promote as-is
+- the next justified action is a narrower Part 3 follow-up that keeps the useful
+  `item-incoterms` signal while reducing Amazon-side over-transfer
+
+## Next narrowed follow-up
+
+The next follow-up should stay screening-only and should not jump to Optuna yet.
+
+Current working hypothesis from `EXP195/196/197`:
+
+- the useful signal is not "constraint conservation everywhere at the same strength"
+- instead, the current integrated transfer is likely too permissive on the Amazon tasks
+- the salt task can still benefit from the stronger transfer path
+
+So the next bundle should narrow the mechanism rather than replace it:
+
+- keep the validated Part 1 base unchanged
+- keep the salt-side transfer close to the first Part 3 pass
+- soften the Amazon-side transfer through confidence gating and lower transfer amplitudes
+- reduce Amazon-side post-alignment retention pressure before spending any Optuna budget
+
+That follow-up is the right next test because it still probes the same Part 3 causal story,
+but avoids turning the search into manual broad hyperparameter scanning.

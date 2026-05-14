@@ -860,6 +860,131 @@
 - Decision:
   - running
 
+### EXP-195 / EXP-196 / EXP-197
+
+- Date: 2026-05-15
+- Branch: `codex/stage3-clean-p13`
+- Target component: first fixed-hyperparameter Part 3 constraint-conservation screening wave
+- Base state:
+  - launch blocker from the first Part 3 rerun was fixed in commit `42ef665`
+  - remote execution now uses the safe clean run root
+    `/fs/fast/u2021201693/lym/Rel-LLM-codex-stage3-clean-p13`
+  - representative tasks were relaunched as:
+    - `EXP195` / `user-churn` on GPU `0`
+    - `EXP196` / `user-ltv` on GPU `1`
+    - `EXP197` / `item-incoterms` on GPU `2`
+- Current persisted runtime reading:
+  - `EXP197` / `item-incoterms` finished first and its remote log was synced into
+    `stage3_notes/reports/log_cache/stage3-exp197.log`
+  - final visible subset metrics from the completed screening run:
+    - best val:
+      - `mrr=0.8728763640873016`
+      - `accuracy=0.8046875`
+    - best test subset:
+      - `mrr=0.7937972780257936`
+      - `accuracy=0.69921875`
+      - `macro_f1=0.09144316730523627`
+  - throughput evidence from the completed subset/test tail:
+    - visible test throughput was about `17.64` batches/sec on one GPU
+    - with per-rank `batch_size=4`, that is about `70.6` items/sec/GPU
+  - interpretation so far:
+    - this is below the optimistic strict subset baseline `mrr=0.8147880873466811`
+    - but it is materially above the current EXP192-family Part 1 screening result
+      `mrr=0.6760867685916514`
+    - under the Stage 3 task-aware rule for `item-incoterms`, this is a promising continuation
+      signal rather than a mechanical drop trigger, because scientific continuation should be
+      judged against the full-test reference band near `0.70`, not only the optimistic subset
+      regime
+  - `EXP195` / `user-churn` is still alive:
+    - latest synced eval at train step `6144/32768`:
+      - val `roc_auc=0.6214048622947879`
+      - test subset `roc_auc=0.6280925393741872`
+      - best selection metric still `0.6471`
+    - visible subset throughput near the latest eval was about `25.43` batches/sec on one GPU
+    - with per-rank `batch_size=3`, that is about `76.3` items/sec/GPU`
+  - `EXP196` / `user-ltv` is still alive:
+    - latest synced eval at train step `5632/32768`:
+      - val `mae=84.14749838568795`
+      - test subset `mae=86.30371976418479`
+      - best selection metric still `76.8150`
+    - visible train throughput remains about `8.1` steps/sec on one GPU
+    - with per-rank `batch_size=2`, that is about `16.2` items/sec/GPU`
+- Next action:
+  - keep monitoring `EXP195` and `EXP196` until they finish or expose a new reproducible blocker
+  - once all three logs are complete, rerun the normal candidate judge/finalize flow, then decide
+    whether the Part 3 mechanism is strong enough to justify separate Optuna
+
+- Completion update later on 2026-05-15:
+  - `EXP195`, `EXP196`, and `EXP197` all finished cleanly
+  - remote tmux windows and local GPUs `0-2` returned idle after completion
+  - final subset outcomes from the official judge report:
+    - `EXP195` / `user-churn`
+      - best test subset `roc_auc=0.6473100325910705`
+      - final judged test metric `roc_auc=0.6280925393741872`
+      - versus screening baseline `0.6540209032382359`: `worse`
+    - `EXP196` / `user-ltv`
+      - best test subset `mae=71.16461192342919`
+      - final judged test metric `mae=86.30371976418479`
+      - versus screening baseline `79.27257269903086`: `worse`
+    - `EXP197` / `item-incoterms`
+      - best test subset `mrr=0.7937972780257936`
+      - final judged test metric `mrr=0.7937972780257936`
+      - versus optimistic screening baseline `0.8147880873466811`: `worse`
+      - versus full-test reference `0.7043105782857789`: `better`
+- Throughput summary from the completed wave:
+  - `EXP195` subset evaluation stayed around `25.2` batches/sec on one GPU
+    - with per-rank `batch_size=3`, about `75.6` items/sec/GPU
+  - `EXP196` train throughput stayed around `8.1` steps/sec on one GPU
+    - with per-rank `batch_size=2`, about `16.2` items/sec/GPU
+  - `EXP197` subset/test throughput stayed around `17.6` batches/sec on one GPU
+    - with per-rank `batch_size=4`, about `70.6` items/sec/GPU
+- Final bundle decision:
+  - official report `stage3_notes/reports/exp195_constraint_conservation_transfer.report.json`
+    marked the bundle `global_verdict=failed` and `candidate_status=failed`
+  - the first coarse Part 3 constraint-conservation implementation therefore does **not** justify
+    immediate Optuna or final full-test continuation as a bundle
+  - search-space reading:
+    - the mechanism did preserve a strong `item-incoterms` continuation signal relative to the
+      real full-test reference band
+    - but it regressed both Amazon tasks enough that the current integrated bundle should be
+      treated as over-aggressive / mis-calibrated rather than promoted directly
+- Next concrete blocker:
+  - do not launch Optuna for `EXP195`
+  - use the completed screening evidence to design a narrower follow-up Part 3 variant that keeps
+    the `item-incoterms` benefit while reducing the Amazon-side regressions
+
+### EXP-198 / EXP-199 / EXP-200
+
+- Date: 2026-05-15
+- Branch: `codex/stage3-clean-p13`
+- Target component: narrowed Part 3 constraint-conservation follow-up with Amazon-side confidence
+  gating
+- Evidence basis:
+  - `EXP195/196/197` showed that the first integrated Part 3 path was too aggressive as a bundle:
+    both Amazon tasks regressed, but `item-incoterms` still beat the stored full-test reference
+    band clearly
+  - that result argues against immediate Optuna for the coarse bundle, but not against the Part 3
+    family itself
+- Change summary:
+  - register candidate
+    `stage3_notes/candidates/exp198_constraint_conservation_gated_amazon_transfer.json`
+  - keep the validated Part 1 artifact-backed base and the Phase 2 task-specific best settings
+  - narrow only the Amazon-side transfer path:
+    - enable `basis_gate_strategy=confidence`
+    - add nonzero `basis_gate_token_floor` and `basis_gate_graph_floor`
+    - reduce Amazon-side `basis_residual_alpha`
+    - strongly reduce or disable Amazon-side graph residual
+    - reduce Amazon-side `basis_lambda_postalign_tok`
+    - remove Amazon-side branch orthogonality pressure
+  - keep the stronger ungated salt-side transfer close to `EXP197` so the useful
+    `item-incoterms` mechanism signal is still being tested rather than accidentally ablated away
+- Intended scientific read:
+  - this is still a screening-only mechanism comparison, not an Optuna step
+  - if it succeeds, the gain should be interpreted as evidence that the Part 3 family needed
+    task-sensitive transfer conservatism rather than wholesale retirement
+  - if it fails again, the next move should likely be a deeper mechanism split rather than manual
+    hyperparameter poking
+
 ### EXP-177 / EXP-178 / EXP-179
 
 - Date: 2026-05-11
