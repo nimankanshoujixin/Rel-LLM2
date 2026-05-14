@@ -5,7 +5,7 @@
   "family": "representation_alignment",
   "source_type": "ablation",
   "launch_mode": "parallel",
-  "status": "ready_for_screening",
+  "status": "running",
   "task_run_ids": {
     "user-churn": "EXP201",
     "user-ltv": "EXP202",
@@ -130,5 +130,25 @@
     "Do not run Optuna or final full test from this candidate directly.",
     "The comparison remains fair because the validated Phase 2 per-task best hyperparameters stay fixed and only the Part 3 transfer/conservation controls are narrowed further.",
     "Scientific interpretation still follows the Stage 3 task-aware rule set: user-ltv subset/full-test scale mismatch still applies, and item-incoterms should still be judged scientifically against the stored full-test reference band rather than only the optimistic subset baseline."
-  ]
+  ],
+  "task_launches": {
+    "user-churn": {
+      "target": "lab25211",
+      "gpu": 3,
+      "window_name": "stage3-exp201",
+      "baseline_default_gpu": 5
+    },
+    "user-ltv": {
+      "target": "lab25211",
+      "gpu": 4,
+      "window_name": "stage3-exp202",
+      "baseline_default_gpu": 6
+    },
+    "item-incoterms": {
+      "target": "lab25211",
+      "gpu": 5,
+      "window_name": "stage3-exp203",
+      "baseline_default_gpu": 7
+    }
+  }
 }

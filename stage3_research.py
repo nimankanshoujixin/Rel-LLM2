@@ -1455,16 +1455,8 @@ def write_task_launches(candidate_path: Path, launches: dict[str, dict[str, Any]
     return candidate
 
 
-def sync_runtime_files_to_targets(rendered: dict[str, Any], config: dict[str, Any]) -> None:
+def upload_wrappers_to_targets(rendered: dict[str, Any], config: dict[str, Any]) -> None:
     targets = build_ssh_targets(config)
-    sync_paths = [ROOT / relative_path for relative_path in config.get("launch_sync_paths", ["main.py", "model.py", "utils.py"])]
-    gnn_repr_package = ROOT / "gnn_repr"
-    if gnn_repr_package.exists():
-        sync_paths.append(gnn_repr_package)
-    gnn_repr_artifacts = ROOT / "artifacts" / "gnn_repr"
-    if gnn_repr_artifacts.exists():
-        sync_paths.append(gnn_repr_artifacts)
-
     files_by_target: dict[str, list[Path]] = {}
     for payload in rendered["wrappers"].values():
         files_by_target.setdefault(payload["target"], [])
@@ -1481,10 +1473,6 @@ def sync_runtime_files_to_targets(rendered: dict[str, Any], config: dict[str, An
                 f"Failed to prepare remote directories on {target.name}: {mkdir_proc.stderr.strip()}"
             )
 
-        sync_proc = scp_to_remote_path(target, sync_paths, target.remote_repo_root)
-        if sync_proc.returncode != 0:
-            raise RuntimeError(f"Code sync failed for {target.name}: {sync_proc.stderr.strip()}")
-
         launcher_paths = [
             Path(payload["script"])
             for owner, payload in rendered["launchers"].items()
@@ -1494,6 +1482,24 @@ def sync_runtime_files_to_targets(rendered: dict[str, Any], config: dict[str, An
         upload_proc = scp_to_remote(target, upload_paths, target.remote_tmp_dir)
         if upload_proc.returncode != 0:
             raise RuntimeError(f"Wrapper sync failed for {target.name}: {upload_proc.stderr.strip()}")
+
+
+def sync_runtime_files_to_targets(rendered: dict[str, Any], config: dict[str, Any]) -> None:
+    targets = build_ssh_targets(config)
+    sync_paths = [ROOT / relative_path for relative_path in config.get("launch_sync_paths", ["main.py", "model.py", "utils.py"])]
+    gnn_repr_package = ROOT / "gnn_repr"
+    if gnn_repr_package.exists():
+        sync_paths.append(gnn_repr_package)
+    gnn_repr_artifacts = ROOT / "artifacts" / "gnn_repr"
+    if gnn_repr_artifacts.exists():
+        sync_paths.append(gnn_repr_artifacts)
+
+    seen_targets: set[str] = set(payload["target"] for payload in rendered["wrappers"].values())
+    for target_name in sorted(seen_targets):
+        target = get_target_by_name(targets, target_name)
+        sync_proc = scp_to_remote_path(target, sync_paths, target.remote_repo_root)
+        if sync_proc.returncode != 0:
+            raise RuntimeError(f"Code sync failed for {target.name}: {sync_proc.stderr.strip()}")
 
 
 def launch_rendered_candidate(rendered: dict[str, Any], config: dict[str, Any]) -> None:
@@ -1678,6 +1684,7 @@ def main() -> None:
         print_rendered(rendered)
         if args.dry_run:
             return
+        upload_wrappers_to_targets(rendered, config)
         if not args.skip_sync:
             sync_runtime_files_to_targets(rendered, config)
         launch_rendered_candidate(rendered, config)
