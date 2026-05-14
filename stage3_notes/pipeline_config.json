@@ -1,6 +1,6 @@
 {
-  "remote_repo_root": "/fs/fast/u2021201693/lym/Rel-LLM",
-  "remote_python": "/fs/fast/u2021201693/lym/Rel-LLM/conda/envs/bin/python",
+  "remote_repo_root": "/fs/fast/u2021201693/lym/Rel-LLM-codex-stage3-clean-p13",
+  "remote_python": "/fs/fast/u2021201693/lym/Rel-LLM-codex-stage3-clean-p13/conda/envs/bin/python",
   "remote_tmp_dir": "/tmp",
   "remote_ssh": {
     "name": "lab25211",
@@ -14,8 +14,8 @@
       "user": "u2021201693",
       "host": "10.10.252.11",
       "port": 22951,
-      "remote_repo_root": "/fs/fast/u2021201693/lym/Rel-LLM",
-      "remote_python": "/fs/fast/u2021201693/lym/Rel-LLM/conda/envs/bin/python",
+      "remote_repo_root": "/fs/fast/u2021201693/lym/Rel-LLM-codex-stage3-clean-p13",
+      "remote_python": "/fs/fast/u2021201693/lym/Rel-LLM-codex-stage3-clean-p13/conda/envs/bin/python",
       "remote_tmp_dir": "/tmp",
       "tmux_session": "lymtmux"
     }

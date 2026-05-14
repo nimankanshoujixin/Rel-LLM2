@@ -873,7 +873,8 @@ class Model(torch.nn.Module):
             if not torch.any(graph_mask):
                 graph_mask = torch.ones_like(logits_graph, dtype=torch.bool)
             p_graph = self._masked_sparse_assignment(logits_graph, graph_mask)
-            r_graph = torch.matmul(p_graph, self.basis_vectors).expand_as(r_token)
+            # Broadcast the graph-level basis residual over the token axis of the current prompt.
+            r_graph = torch.matmul(p_graph, self.basis_vectors).expand_as(token_transfer)
 
             beta = float(min(max(self.basis_residual_alpha, 0.0), 1.0))
             graph_alpha = float(max(self.basis_graph_alpha, 0.0))
