@@ -986,6 +986,11 @@ def main() -> None:
                     summary["align_token_bce"] = model_for_io.latest_align_components["token_bce"]
                     summary["align_graph_bce"] = model_for_io.latest_align_components["graph_bce"]
                     summary["align_entropy"] = model_for_io.latest_align_components["entropy"]
+                    summary["align_postalign_token_bce"] = model_for_io.latest_align_components["postalign_token_bce"]
+                    summary["align_entity_identity"] = model_for_io.latest_align_components["entity_identity"]
+                    summary["align_branch_orth"] = model_for_io.latest_align_components["branch_orth"]
+                    summary["align_token_gate"] = model_for_io.latest_align_components["token_gate"]
+                    summary["align_graph_gate"] = model_for_io.latest_align_components["graph_gate"]
                 if run is not None:
                     for k, v in summary.items():
                         run.log({f"train/{k}": v}, step=steps)

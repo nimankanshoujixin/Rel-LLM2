@@ -261,7 +261,17 @@ class Model(torch.nn.Module):
             self.basis_indices_by_table_prefix,
             self.basis_indices_by_table_pair,
             self.basis_indices_by_join_pair,
+            self.basis_indices_by_directed_fk_pair,
         ) = self._build_basis_index_maps(self.basis_ids)
+        schema_mask = torch.zeros(len(self.basis_ids), dtype=torch.bool)
+        value_mask = torch.zeros(len(self.basis_ids), dtype=torch.bool)
+        for idx, basis_type in enumerate(self.basis_types):
+            if basis_type.startswith("stat_"):
+                value_mask[idx] = True
+            else:
+                schema_mask[idx] = True
+        self.register_buffer("basis_schema_mask", schema_mask, persistent=False)
+        self.register_buffer("basis_value_mask", value_mask, persistent=False)
         self.basis_query_norm = LayerNorm(out_dim).to(self.model_device)
         self.basis_token_query_proj = Linear(out_dim, out_dim, bias=False).to(self.model_device)
         self.basis_graph_query_proj = Linear(out_dim, out_dim, bias=False).to(self.model_device)
@@ -286,11 +296,13 @@ class Model(torch.nn.Module):
         dict[str, dict[str, list[int]]],
         dict[tuple[str, str], list[int]],
         dict[tuple[str, str], list[int]],
+        dict[tuple[str, str], list[int]],
     ]:
         table_map: dict[str, list[int]] = defaultdict(list)
         table_prefix_map: dict[str, dict[str, list[int]]] = defaultdict(lambda: defaultdict(list))
         table_pair_map: dict[tuple[str, str], list[int]] = defaultdict(list)
         join_pair_map: dict[tuple[str, str], list[int]] = defaultdict(list)
+        directed_fk_pair_map: dict[tuple[str, str], list[int]] = defaultdict(list)
 
         for idx, basis_id in enumerate(basis_ids):
             parts = basis_id.split("::")
@@ -302,6 +314,7 @@ class Model(torch.nn.Module):
             elif prefix == "fk":
                 src_table, dst_table = parts[1], parts[3]
                 table_pair_map[self._canonical_pair(src_table, dst_table)].append(idx)
+                directed_fk_pair_map[(src_table, dst_table)].append(idx)
             elif prefix == "join" and len(parts) == 3:
                 join_pair_map[self._canonical_pair(parts[1], parts[2])].append(idx)
 
@@ -310,7 +323,74 @@ class Model(torch.nn.Module):
             {table: {prefix: list(indices) for prefix, indices in prefix_map.items()} for table, prefix_map in table_prefix_map.items()},
             dict(table_pair_map),
             dict(join_pair_map),
+            dict(directed_fk_pair_map),
         )
+
+    @staticmethod
+    def _zero_align_components() -> dict[str, float]:
+        return {
+            "token_bce": 0.0,
+            "graph_bce": 0.0,
+            "entropy": 0.0,
+            "token_recon": 0.0,
+            "graph_recon": 0.0,
+            "fk_direction": 0.0,
+            "route_consistency": 0.0,
+            "postalign_token_bce": 0.0,
+            "entity_identity": 0.0,
+            "branch_orth": 0.0,
+            "token_gate": 0.0,
+            "graph_gate": 0.0,
+        }
+
+    def _masked_sparse_assignment(self, logits: Tensor, mask: Tensor) -> Tensor:
+        probs = torch.zeros_like(logits)
+        if logits.numel() == 0:
+            return probs
+        valid_rows = mask.any(dim=-1)
+        if not torch.any(valid_rows):
+            return probs
+        masked_logits = logits[valid_rows].masked_fill(~mask[valid_rows], -1e4)
+        row_probs = sparsemax(masked_logits, dim=-1)
+        if self.basis_assignment_topk > 0 and row_probs.size(-1) > self.basis_assignment_topk:
+            topk = min(self.basis_assignment_topk, row_probs.size(-1))
+            topk_values, topk_indices = torch.topk(row_probs, k=topk, dim=-1)
+            sparse_probs = torch.zeros_like(row_probs)
+            sparse_probs.scatter_(dim=-1, index=topk_indices, src=topk_values)
+            denom = sparse_probs.sum(dim=-1, keepdim=True).clamp_min(1e-12)
+            row_probs = sparse_probs / denom
+        probs[valid_rows] = row_probs
+        return probs
+
+    def _confidence_gate(self, confidence: Tensor, floor: float) -> Tensor:
+        if self.basis_gate_strategy != "confidence":
+            return torch.ones_like(confidence)
+        denom = max(1.0 - float(floor), 1e-6)
+        return ((confidence - float(floor)) / denom).clamp_(0.0, 1.0)
+
+    def _entity_identity_loss(self, pre_seeds: list[Tensor], post_seeds: list[Tensor]) -> Tensor:
+        if len(pre_seeds) <= 1:
+            return self.word_embedding.weight.new_zeros(())
+        pre = F.normalize(torch.stack([seed.detach() for seed in pre_seeds], dim=0).float(), dim=-1)
+        post = F.normalize(torch.stack(post_seeds, dim=0).float(), dim=-1)
+        logits = torch.matmul(post, pre.t()) / self.basis_entity_identity_temperature
+        labels = torch.arange(logits.size(0), device=logits.device)
+        return 0.5 * (
+            F.cross_entropy(logits, labels) +
+            F.cross_entropy(logits.t(), labels)
+        )
+
+    @staticmethod
+    def _branch_orthogonality_loss(schema_repr: Tensor, value_repr: Tensor, active_mask: Tensor) -> Tensor:
+        if schema_repr.numel() == 0 or value_repr.numel() == 0:
+            return schema_repr.new_zeros(())
+        if active_mask.dim() > 1:
+            active_mask = active_mask.squeeze(-1)
+        if not torch.any(active_mask):
+            return schema_repr.new_zeros(())
+        schema_active = F.normalize(schema_repr[active_mask].float(), dim=-1)
+        value_active = F.normalize(value_repr[active_mask].float(), dim=-1)
+        return (schema_active * value_active).sum(dim=-1).pow(2).mean()
 
     @property
     def device(self):
@@ -691,20 +771,26 @@ class Model(torch.nn.Module):
 
             if parent_table is not None:
                 pair = self._canonical_pair(parent_table, table_name)
-                pair_indices = self.basis_indices_by_table_pair.get(pair, [])
+                directed_fk_indices = self.basis_indices_by_directed_fk_pair.get(
+                    (table_name, parent_table),
+                    self.basis_indices_by_table_pair.get(pair, []),
+                )
                 join_indices = self.basis_indices_by_join_pair.get(pair, [])
-                related_mask_indices.update(pair_indices)
+                related_mask_indices.update(directed_fk_indices)
                 related_mask_indices.update(join_indices)
-                self._add_basis_indices(related_target_indices, pair_indices, 1.0)
+                self._add_basis_indices(related_target_indices, directed_fk_indices, 1.0)
                 self._add_basis_indices(related_target_indices, join_indices, 1.0)
 
             for child_table in child_tables:
                 pair = self._canonical_pair(table_name, child_table)
-                pair_indices = self.basis_indices_by_table_pair.get(pair, [])
+                directed_fk_indices = self.basis_indices_by_directed_fk_pair.get(
+                    (child_table, table_name),
+                    self.basis_indices_by_table_pair.get(pair, []),
+                )
                 join_indices = self.basis_indices_by_join_pair.get(pair, [])
-                related_mask_indices.update(pair_indices)
+                related_mask_indices.update(directed_fk_indices)
                 related_mask_indices.update(join_indices)
-                self._add_basis_indices(related_target_indices, pair_indices, 1.0)
+                self._add_basis_indices(related_target_indices, directed_fk_indices, 1.0)
                 self._add_basis_indices(related_target_indices, join_indices, 1.0)
 
             if related_mask_indices:
@@ -738,27 +824,20 @@ class Model(torch.nn.Module):
     ) -> tuple[list[Tensor], Tensor]:
         if not self.basis_enabled or not graph_prompts:
             zero = self.word_embedding.weight.new_zeros(())
-            self.latest_align_components = {
-                "token_bce": 0.0,
-                "graph_bce": 0.0,
-                "entropy": 0.0,
-                "token_recon": 0.0,
-                "graph_recon": 0.0,
-                "fk_direction": 0.0,
-                "route_consistency": 0.0,
-                "postalign_token_bce": 0.0,
-                "entity_identity": 0.0,
-                "branch_orth": 0.0,
-                "token_gate": 0.0,
-                "graph_gate": 0.0,
-            }
+            self.latest_align_components = self._zero_align_components()
             return graph_prompts, zero
 
         align_losses = []
         token_bce_vals = []
         graph_bce_vals = []
         entropy_vals = []
+        postalign_vals = []
+        branch_orth_vals = []
+        token_gate_vals = []
+        graph_gate_vals = []
         aligned_prompts: list[Tensor] = []
+        pre_seed_batch: list[Tensor] = []
+        post_seed_batch: list[Tensor] = []
 
         for prompt, token_meta in zip(graph_prompts, token_meta_batch):
             prompt_query = self._encode_basis_query(prompt, graph_level=False)
@@ -769,37 +848,91 @@ class Model(torch.nn.Module):
                 logits_token.device,
             )
             masked_logits = logits_token.masked_fill(~token_mask, -1e4)
-            p_token = sparsemax(masked_logits, dim=-1)
-            r_token = torch.matmul(p_token, self.basis_vectors)
+            p_token = self._masked_sparse_assignment(logits_token, token_mask)
+
+            schema_mask = token_mask & self.basis_schema_mask.unsqueeze(0)
+            value_mask = token_mask & self.basis_value_mask.unsqueeze(0)
+            p_schema = self._masked_sparse_assignment(logits_token, schema_mask)
+            p_value = self._masked_sparse_assignment(logits_token, value_mask)
+            schema_repr = torch.matmul(p_schema, self.basis_vectors)
+            value_repr = torch.matmul(p_value, self.basis_vectors)
+            schema_conf = p_schema.max(dim=-1).values
+            value_conf = p_value.max(dim=-1).values
+            branch_mass = (schema_conf + value_conf).clamp_min(1e-12)
+            schema_weight = schema_conf / branch_mass
+            value_weight = value_conf / branch_mass
+            token_transfer = (
+                schema_weight.unsqueeze(-1) * schema_repr +
+                value_weight.unsqueeze(-1) * value_repr
+            )
 
             graph_seed = prompt.mean(dim=0, keepdim=True)
             graph_query = self._encode_basis_query(graph_seed, graph_level=True)
             logits_graph = torch.matmul(graph_query, self.basis_norm.t()) / self.basis_tau
-            p_graph = sparsemax(logits_graph, dim=-1)
+            graph_mask = graph_target.unsqueeze(0) > 0
+            if not torch.any(graph_mask):
+                graph_mask = torch.ones_like(logits_graph, dtype=torch.bool)
+            p_graph = self._masked_sparse_assignment(logits_graph, graph_mask)
             r_graph = torch.matmul(p_graph, self.basis_vectors).expand_as(r_token)
 
             beta = float(min(max(self.basis_residual_alpha, 0.0), 1.0))
             graph_alpha = float(max(self.basis_graph_alpha, 0.0))
-            aligned_prompt = (1.0 - beta) * prompt + beta * r_token.to(
+            token_gate = self._confidence_gate(
+                torch.maximum(schema_conf, value_conf),
+                self.basis_gate_token_floor,
+            ).unsqueeze(-1)
+            graph_conf = p_graph.max(dim=-1).values.mean().unsqueeze(0)
+            graph_gate = self._confidence_gate(
+                graph_conf,
+                self.basis_gate_graph_floor,
+            ).view(1, 1)
+            aligned_prompt = (1.0 - beta) * prompt + beta * token_gate * token_transfer.to(
                 device=prompt.device,
                 dtype=prompt.dtype,
-            ) + graph_alpha * r_graph.to(device=prompt.device, dtype=prompt.dtype)
+            ) + graph_alpha * graph_gate * r_graph.to(device=prompt.device, dtype=prompt.dtype)
             aligned_prompts.append(aligned_prompt)
+            pre_seed_batch.append(prompt[0])
+            post_seed_batch.append(aligned_prompt[0])
 
             token_bce = F.binary_cross_entropy_with_logits(masked_logits, token_targets)
             entropy = -(p_token * torch.log(p_token.clamp_min(1e-12))).sum(dim=-1).mean()
-
             graph_bce = F.binary_cross_entropy_with_logits(logits_graph.squeeze(0), graph_target)
+            postalign_token_bce = prompt.new_zeros(())
+            if self.basis_lambda_postalign_tok > 0:
+                post_query = self._encode_basis_query(aligned_prompt, graph_level=False)
+                post_logits = torch.matmul(post_query, self.basis_norm.t()) / self.basis_tau
+                masked_post_logits = post_logits.masked_fill(~token_mask, -1e4)
+                postalign_token_bce = F.binary_cross_entropy_with_logits(masked_post_logits, token_targets)
+            branch_orth = prompt.new_zeros(())
+            if self.basis_lambda_branch_orth > 0:
+                branch_orth = self._branch_orthogonality_loss(
+                    schema_repr,
+                    value_repr,
+                    (schema_conf > 0) & (value_conf > 0),
+                )
 
             align_loss = (
                 self.basis_lambda_tok * token_bce
                 + self.basis_lambda_g * graph_bce
                 - self.basis_lambda_sharp * entropy
+                + self.basis_lambda_postalign_tok * postalign_token_bce
+                + self.basis_lambda_branch_orth * branch_orth
             )
             align_losses.append(align_loss)
             token_bce_vals.append(float(token_bce.detach().cpu()))
             graph_bce_vals.append(float(graph_bce.detach().cpu()))
             entropy_vals.append(float(entropy.detach().cpu()))
+            postalign_vals.append(float(postalign_token_bce.detach().cpu()))
+            branch_orth_vals.append(float(branch_orth.detach().cpu()))
+            token_gate_vals.append(float(token_gate.detach().mean().cpu()))
+            graph_gate_vals.append(float(graph_gate.detach().mean().cpu()))
+
+        entity_identity = self.word_embedding.weight.new_zeros(())
+        if self.basis_lambda_entity_identity > 0:
+            entity_identity = self._entity_identity_loss(pre_seed_batch, post_seed_batch)
+
+        total_align_loss = torch.stack(align_losses).mean()
+        total_align_loss = total_align_loss + self.basis_lambda_entity_identity * entity_identity
 
         self.latest_align_components = {
             "token_bce": sum(token_bce_vals) / max(len(token_bce_vals), 1),
@@ -809,31 +942,18 @@ class Model(torch.nn.Module):
             "graph_recon": 0.0,
             "fk_direction": 0.0,
             "route_consistency": 0.0,
-            "postalign_token_bce": 0.0,
-            "entity_identity": 0.0,
-            "branch_orth": 0.0,
-            "token_gate": 0.0,
-            "graph_gate": 0.0,
+            "postalign_token_bce": sum(postalign_vals) / max(len(postalign_vals), 1),
+            "entity_identity": float(entity_identity.detach().cpu()),
+            "branch_orth": sum(branch_orth_vals) / max(len(branch_orth_vals), 1),
+            "token_gate": sum(token_gate_vals) / max(len(token_gate_vals), 1),
+            "graph_gate": sum(graph_gate_vals) / max(len(graph_gate_vals), 1),
         }
-        return aligned_prompts, torch.stack(align_losses).mean()
+        return aligned_prompts, total_align_loss
 
     def forward(self, batch: HeteroData, entity_table: NodeType, context=True, demo_info=None, inference: bool = False, pretrain_mode: bool = False) -> Tensor:
         if self.model is not None:
             self.latest_align_loss = self.word_embedding.weight.new_zeros(())
-            self.latest_align_components = {
-                "token_bce": 0.0,
-                "graph_bce": 0.0,
-                "entropy": 0.0,
-                "token_recon": 0.0,
-                "graph_recon": 0.0,
-                "fk_direction": 0.0,
-                "route_consistency": 0.0,
-                "postalign_token_bce": 0.0,
-                "entity_identity": 0.0,
-                "branch_orth": 0.0,
-                "token_gate": 0.0,
-                "graph_gate": 0.0,
-            }
+            self.latest_align_components = self._zero_align_components()
         if pretrain_mode:
             return self.pretrain(batch, entity_table)
         x_dict, batch_size = self.encode(batch, entity_table)

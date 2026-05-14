@@ -154,3 +154,30 @@ Required handling for this blocker:
   user-churn-specific attribution detour
 - keep Optuna and final-test confirmation as separate later phases after the Part 3 implementation
   step is ready
+
+## Part 3 implementation status on 2026-05-15
+
+The documented constraint-conservation layer has now started moving from placeholder knobs to
+actual code in the clean worktree.
+
+Current persisted implementation status:
+
+- `model.py` now contains a real constraint-conservation transfer path on top of the validated
+  Part 1 base:
+  - schema/value branch-split transfer from `basis_types`
+  - sparse top-k assignment enforcement
+  - optional confidence gating
+  - post-alignment token-target retention
+  - entity-identity contrastive preservation
+  - branch orthogonality regularization
+  - directed-FK-aware target construction
+- `main.py` now logs the new Part 3 alignment components so later screening runs can diagnose
+  whether the new mechanism is actually active
+
+Immediate program consequence:
+
+- the next required action is no longer more documentation-only correction
+- it is to run the first fair comparison wave using the current Part 1 Phase 2 best settings as
+  fixed hyperparameters
+- only after that fixed-hyperparameter Part 3 screening wave should the program decide whether to
+  invest in a separate Optuna phase

@@ -221,6 +221,44 @@
   - first persist the Part 3 constraint-conservation candidate story and static gate
   - only after that should the next launch decision be made
 
+## Part 3 implementation checkpoint
+
+- Date: 2026-05-15
+- Branch: `codex/stage3-clean-p13`
+- Target component: EXP192-family Part 3 constraint-conservation transfer
+- Why now:
+  - Phase 2 already made the current Part 1 state validation-backed enough to use as the base
+  - the next blocker is implementation of the documented `受约束守恒迁移 /
+    constraint-conservation transfer` layer rather than another attribution detour
+- Code change summary:
+  - `model.py`
+    - turn previously exposed Part 3 knobs into a real active transfer/loss path inside
+      `align_token_prompts(...)`
+    - split basis transfer into schema vs value/stat branches from `basis_types`
+    - enforce sparse top-k assignment through `basis_assignment_topk`
+    - support confidence-gated conservative transfer through the existing basis gate knobs
+    - add active post-alignment token-target retention
+    - add active entity-identity contrastive preservation
+    - add active branch orthogonality regularization
+    - prefer directed FK basis targets when the artifact exposes them
+  - `main.py`
+    - log the new alignment-side diagnostics:
+      - `align_postalign_token_bce`
+      - `align_entity_identity`
+      - `align_branch_orth`
+      - `align_token_gate`
+      - `align_graph_gate`
+- Validation:
+  - passed `python -m py_compile model.py main.py tune_hyperparameters.py stage3_research.py`
+  - passed `git diff --check`
+- Interpretation:
+  - this is an implementation checkpoint, not yet a new scientific verdict
+  - the next fair comparison must keep the current task-specific Phase 2 best hyperparameters fixed
+    so the first Part 3 screen is mechanism-comparable to the validated Part 1 base
+- Next action:
+  - commit and push this implementation checkpoint
+  - then launch the first fixed-hyperparameter Part 3 screening wave from the clean worktree
+
 ## Screening Protocol Update
 
 - Date: 2026-05-05

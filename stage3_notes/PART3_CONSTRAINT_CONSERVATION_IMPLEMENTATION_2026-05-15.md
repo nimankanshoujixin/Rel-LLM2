@@ -1,0 +1,79 @@
+# Part 3 Constraint Conservation Implementation
+
+Date: 2026-05-15
+
+Scope:
+
+- clean worktree only: `G:\RelLLM-2\Rel-LLM-clean-p13`
+- branch: `codex/stage3-clean-p13`
+- base state: EXP192-family Part 1 after Phase 2 persistence
+
+## What is implemented now
+
+This pass moves Part 3 from "documented intent plus exposed knobs" to a real code path inside
+`model.py`.
+
+The implemented constraint-conservation layer now does all of the following during
+`align_token_prompts(...)`:
+
+- split basis transfer into schema branch vs value/stat branch using `basis_types`
+- keep sparse basis assignment and honor `basis_assignment_topk`
+- support confidence-gated conservative transfer through:
+  - `basis_gate_strategy`
+  - `basis_gate_token_floor`
+  - `basis_gate_graph_floor`
+- apply post-alignment target retention when `basis_lambda_postalign_tok > 0`
+- apply minibatch entity-identity contrastive preservation when
+  `basis_lambda_entity_identity > 0`
+- apply schema/value branch orthogonality regularization when
+  `basis_lambda_branch_orth > 0`
+- preserve FK direction asymmetry in target construction by preferring directed FK basis indices
+  over undirected table-pair fallback when available
+
+`main.py` now also logs the new alignment-side components:
+
+- `train/align_postalign_token_bce`
+- `train/align_entity_identity`
+- `train/align_branch_orth`
+- `train/align_token_gate`
+- `train/align_graph_gate`
+
+## Important boundary
+
+This is intentionally a coarse-grained Part 3 implementation pass, not a full scientific win
+claim.
+
+Still not implemented in this pass:
+
+- a new standalone bridge-sensitivity loss
+- a revived route-consistency or FK-direction-only bundle
+- Part 3 Optuna or final full test
+
+That is deliberate. The current goal is to make the documented Part 3 layer real and launchable
+before launching a fresh comparison wave.
+
+## Fair-comparison rule for the next run
+
+The first Part 3 comparison run should keep the same task-specific hyperparameters as the current
+validated Part 1 Phase 2 best settings, so the mechanism comparison is apples-to-apples.
+
+Use these fixed best-setting sources as the first comparison baseline:
+
+- `optuna_runs/exp192_user_churn_optuna_20260513t2307/best_trial.json`
+- `optuna_runs/exp193_user_ltv_optuna_20260514t141722/best_trial.json`
+- `optuna_runs/exp194_item_incoterms_optuna_20260513t2307/best_trial.json`
+
+Interpretation rule remains unchanged:
+
+- screening / `test_subset` is only the continuation gate
+- final science still uses full-test references
+- user-ltv subset/full-test scale mismatch still applies
+- item-incoterms subset remains too optimistic for final judgment
+
+## Next concrete action
+
+1. render or register the Part 3 screening candidate using the same task-specific best settings
+2. run static sanity plus a short launchability/smoke gate
+3. run the first fixed-hyperparameter Part 3 screening wave
+4. only if that wave is promising, move on to separate Optuna
+5. only after Optuna selection, run separate final-test-only confirmation
