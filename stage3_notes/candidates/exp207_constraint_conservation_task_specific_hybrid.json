@@ -1,21 +1,21 @@
 {
-  "bundle_id": "BUNDLE-204",
-  "slug": "constraint_conservation_salt_only_control",
-  "title": "Constraint conservation salt-only control",
+  "bundle_id": "BUNDLE-207",
+  "slug": "constraint_conservation_task_specific_hybrid",
+  "title": "Constraint conservation task-specific hybrid follow-up",
   "family": "representation_alignment",
   "source_type": "ablation",
   "launch_mode": "parallel",
-  "status": "retune_plausible",
+  "status": "draft",
   "task_run_ids": {
-    "user-churn": "EXP204",
-    "user-ltv": "EXP205",
-    "item-incoterms": "EXP206"
+    "user-churn": "EXP207",
+    "user-ltv": "EXP208",
+    "item-incoterms": "EXP209"
   },
   "literature": {
     "queries": [
-      "task selective graph transfer negative transfer disable source path ablation",
-      "domain selective prompt transfer conservative graph alignment control ablation",
-      "when to disable transfer branch to avoid negative transfer structured representation alignment"
+      "task selective transfer negative transfer structured representation alignment hybrid ablation",
+      "per task transfer gating avoid negative transfer multi-domain graph representation",
+      "task specific conservative transfer control structured prompt alignment"
     ],
     "papers": []
   },
@@ -32,11 +32,14 @@
       "EXP200",
       "EXP201",
       "EXP202",
-      "EXP203"
+      "EXP203",
+      "EXP204",
+      "EXP205",
+      "EXP206"
     ],
-    "why_now": "EXP201 removed the new Amazon-side conservation penalties and pulled both Amazon tasks back to screening-neutral while preserving the strong salt-side continuation signal, but it still did not create positive Amazon evidence. The next justified causal control is therefore to test whether the remaining Amazon harm comes from any Amazon-side transfer at all: keep the validated Part 1 base on Amazon, keep the stronger salt-side Part 3 path unchanged, and measure whether task-selective enablement is the cleaner continuation."
+    "why_now": "EXP201 and EXP204 together narrowed the Part 3 causal picture into a task-specific split: user-churn regressed badly when Amazon transfer was disabled entirely, while user-ltv improved the most when Amazon transfer was pushed furthest down, and item-incoterms kept the same strong salt-side continuation signal in both bundles. The next justified continuation is therefore a hybrid screen that keeps the salt-side path fixed while assigning each Amazon representative task the narrower setting that best matched its own screening evidence."
   },
-  "hypothesis": "If the useful Part 3 mechanism is genuinely task-selective and the remaining Amazon regression after EXP201 comes from graph-to-token transfer itself rather than from the already-removed Amazon-side conservation losses, then disabling Amazon-side residual and graph injection entirely while preserving the strong salt-side configuration should recover the validated Amazon baseline behavior without sacrificing the salt-side gain signal.",
+  "hypothesis": "If the surviving Part 3 signal is genuinely task-specific across the representative tasks, then keeping user-churn near the EXP201 Amazon gate-only setting, keeping user-ltv near the EXP204 Amazon-off setting, and leaving the stronger salt-side path unchanged should preserve the user-ltv continuation signal without reintroducing the severe user-churn regression seen when Amazon transfer was disabled uniformly.",
   "common_overrides": {
     "basis_assignment_topk": 4,
     "basis_entity_identity_temperature": 0.1
@@ -53,7 +56,7 @@
       "batch_size": 3,
       "lr": 0.00021677846214357684,
       "wd": 0.0016973078532467015,
-      "basis_residual_alpha": 0.0,
+      "basis_residual_alpha": 0.08,
       "basis_graph_alpha": 0.0,
       "basis_tau": 0.037659918741014,
       "basis_lambda_tok": 0.31528154175096096,
@@ -62,9 +65,9 @@
       "basis_lambda_postalign_tok": 0.0,
       "basis_lambda_entity_identity": 0.0,
       "basis_lambda_branch_orth": 0.0,
-      "basis_gate_strategy": "none",
-      "basis_gate_token_floor": 0.0,
-      "basis_gate_graph_floor": 0.0,
+      "basis_gate_strategy": "confidence",
+      "basis_gate_token_floor": 0.5,
+      "basis_gate_graph_floor": 0.85,
       "loss_class_weight": [
         1.0,
         1.7768682564439144
@@ -128,30 +131,10 @@
     }
   },
   "notes": [
-    "This is a screening-only causal control after EXP201 showed that removing Amazon-side conservation penalties restores both Amazon tasks to screening-neutral without breaking the salt-side signal.",
-    "The intended split is stricter than EXP201: Amazon-side Part 3 transfer itself is disabled, while the validated salt-side Part 3 path stays unchanged.",
+    "This is a screening-only hybrid follow-up after EXP201 and EXP204 together suggested a task-specific split across the two Amazon representative tasks.",
+    "The intended comparison is narrow and evidence-driven rather than a broad manual hyperparameter scan: user-churn keeps the EXP201 gate-only Amazon setting, user-ltv keeps the EXP204 Amazon-off setting, and the stronger salt-side Part 3 path stays unchanged.",
     "Do not run Optuna or final full test from this candidate directly.",
-    "The comparison remains fair because the validated Phase 2 per-task best hyperparameters stay fixed and only the task-selective Part 3 transfer enablement changes.",
+    "The comparison remains fair because the validated Phase 2 per-task best hyperparameters stay fixed and only the task-specific Part 3 transfer control differs.",
     "Scientific interpretation still follows the Stage 3 task-aware rule set: user-ltv subset/full-test scale mismatch still applies, and item-incoterms should still be judged scientifically against the stored full-test reference band rather than only the optimistic subset baseline."
-  ],
-  "task_launches": {
-    "user-churn": {
-      "target": "lab25211",
-      "gpu": 0,
-      "window_name": "stage3-exp204",
-      "baseline_default_gpu": 5
-    },
-    "user-ltv": {
-      "target": "lab25211",
-      "gpu": 1,
-      "window_name": "stage3-exp205",
-      "baseline_default_gpu": 6
-    },
-    "item-incoterms": {
-      "target": "lab25211",
-      "gpu": 2,
-      "window_name": "stage3-exp206",
-      "baseline_default_gpu": 7
-    }
-  }
+  ]
 }

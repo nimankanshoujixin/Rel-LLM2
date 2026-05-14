@@ -255,3 +255,70 @@ The next justified screening step is therefore a stricter task-selective control
 That follow-up is now the cleanest continuation because it asks a sharper question than `EXP201`:
 is Part 3 actually only worth enabling on the salt-side representative task, while Amazon should
 stay on the validated Part 1 base?
+
+## Fifth causal control outcome
+
+The stricter salt-only control has now completed as:
+
+- `EXP204` / `user-churn`
+- `EXP205` / `user-ltv`
+- `EXP206` / `item-incoterms`
+
+Outcome summary:
+
+- official report:
+  - `stage3_notes/reports/exp204_constraint_conservation_salt_only_control.report.json`
+- bundle verdict:
+  - `failed`
+- candidate status:
+  - `retune_plausible`
+- throughput reading from the finished logs:
+  - `EXP204` / `user-churn`
+    - visible `TestSubset` throughput about `25.8-26.3 it/s`
+    - with per-rank `batch_size=3` on one GPU, about `77.4-78.9 items/sec/GPU`
+  - `EXP205` / `user-ltv`
+    - visible subset throughput about `21.7-22.7 it/s`
+    - with per-rank `batch_size=2` on one GPU, about `43.4-45.4 items/sec/GPU`
+  - `EXP206` / `item-incoterms`
+    - visible subset/test throughput about `18.0-18.2 it/s`
+    - with per-rank `batch_size=4` on one GPU, about `72.0-72.8 items/sec/GPU`
+- task reading:
+  - `user-churn`
+    - final judged test metric `roc_auc=0.625636168060751`
+    - this regressed sharply from the `EXP201` screening-neutral result
+    - it is also clearly below the stored full-test reference `0.6918065868366201`
+  - `user-ltv`
+    - final judged test metric `mae=73.06070133219387`
+    - this improved materially relative to the earlier Part 3 Amazon variants
+    - under the user-ltv screen/full-test mismatch rule it remains only screening `neutral`,
+      because the gain stayed just inside the replay-aware noise floor
+  - `item-incoterms`
+    - final judged test metric `mrr=0.7937755766369047`
+    - again below the optimistic screening baseline `0.8147880873466811`
+    - but again clearly above the stored full-test reference `0.7043105782857789`
+
+Program consequence:
+
+- `EXP204` should not advance as a full bundle to Optuna or final full test
+- the new evidence is still useful:
+  - disabling Amazon transfer entirely is too aggressive for `user-churn`
+  - but it helped `user-ltv` more than the earlier Part 3 Amazon variants
+  - the salt-side Part 3 path still looks robust and should stay fixed
+- the resulting causal picture is now task-split rather than bundle-uniform:
+  - `user-churn` appears to want some restrained Amazon transfer, closer to `EXP201`
+  - `user-ltv` appears to prefer Amazon transfer pushed further down, closer to `EXP204`
+  - `item-incoterms` should keep the stronger salt-side Part 3 path unchanged
+
+## Next task-specific hybrid control
+
+The next justified screening step is therefore not another bundle-wide Amazon setting, but a
+task-specific hybrid follow-up:
+
+- keep the validated Part 1 base unchanged
+- keep the stronger salt-side Part 3 path unchanged
+- keep `user-churn` close to the `EXP201` Amazon gate-only setting
+- keep `user-ltv` close to the `EXP204` Amazon-off setting
+
+That follow-up is the cleanest next continuation because it directly tests the newest evidence from
+`EXP201` plus `EXP204`: the useful Part 3 signal may be task-selective across the two Amazon
+representative tasks, not only between Amazon and salt.

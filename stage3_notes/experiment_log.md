@@ -860,6 +860,78 @@
 - Decision:
   - running
 
+## EXP204 salt-only control completion
+
+- Date: 2026-05-15
+- Branch: `codex/stage3-clean-p13`
+- Target component: Part 3 salt-only control after the `EXP201` Amazon gate-only follow-up
+- Remote state recheck before continuation:
+  - safe remote run root remains
+    `/fs/fast/u2021201693/lym/Rel-LLM-codex-stage3-clean-p13`
+  - tmux session `lymtmux` returned to only `0:bash`
+  - no live `main.py`, `torch.distributed.run`, or `tune_hyperparameters.py` chain remained
+  - all eight GPUs were idle at recheck time
+  - the remote safe root still showed tracked dirt in `model.py`, so future screening launches
+    should continue using the safe committed launcher path with `--skip-sync` unless runtime code
+    changes again
+- Candidate/report artifacts:
+  - candidate:
+    `stage3_notes/candidates/exp204_constraint_conservation_salt_only_control.json`
+  - official report:
+    `stage3_notes/reports/exp204_constraint_conservation_salt_only_control.report.json`
+  - log cache:
+    - `stage3_notes/reports/log_cache/stage3-exp204.log`
+    - `stage3_notes/reports/log_cache/stage3-exp205.log`
+    - `stage3_notes/reports/log_cache/stage3-exp206.log`
+- Final judged screening metrics:
+  - `EXP204` / `user-churn`:
+    - `average_precision=0.683553231109458`
+    - `accuracy=0.654296875`
+    - `f1=0.772785622593068`
+    - `roc_auc=0.625636168060751`
+  - `EXP205` / `user-ltv`:
+    - `r2=-0.005140275042125442`
+    - `mae=73.06070133219387`
+    - `rmse=127.00425255883299`
+  - `EXP206` / `item-incoterms`:
+    - `accuracy=0.69921875`
+    - `macro_f1=0.09144316730523627`
+    - `micro_f1=0.69921875`
+    - `mrr=0.7937755766369047`
+- Throughput reading from the finished logs:
+  - `EXP204` / `user-churn`:
+    - visible subset throughput about `25.8-26.3 it/s`
+    - with per-rank `batch_size=3` on one GPU, about `77.4-78.9 items/sec/GPU`
+  - `EXP205` / `user-ltv`:
+    - visible subset throughput about `21.7-22.7 it/s`
+    - with per-rank `batch_size=2` on one GPU, about `43.4-45.4 items/sec/GPU`
+  - `EXP206` / `item-incoterms`:
+    - visible subset/test throughput about `18.0-18.2 it/s`
+    - with per-rank `batch_size=4` on one GPU, about `72.0-72.8 items/sec/GPU`
+- Bundle-level judgment:
+  - global verdict `failed`
+  - candidate status `retune_plausible`
+- Interpretation:
+  - `user-churn` became clearly worse than both the screening baseline and the stored full-test
+    reference, so fully disabling Amazon transfer is too aggressive for this task
+  - `user-ltv` improved substantially relative to the earlier Part 3 Amazon variants, but under
+    the documented user-ltv subset/full-test mismatch rule it remains only screening `neutral`
+    because the gain stayed just inside the replay-aware effective delta
+  - `item-incoterms` again stayed below the optimistic subset baseline while clearly beating the
+    stored full-test reference band, so the salt-side Part 3 signal remains robust
+- Program consequence:
+  - do not run Optuna or final full test for the exact `EXP204` bundle
+  - the newest evidence now argues for a task-specific hybrid rather than another bundle-uniform
+    Amazon setting
+  - the next justified screen should keep:
+    - `user-churn` closer to `EXP201`
+    - `user-ltv` closer to `EXP204`
+    - `item-incoterms` unchanged on the stronger salt-side Part 3 path
+- Next concrete blocker:
+  - register and launch a screening-only task-specific hybrid follow-up under the same fixed
+    Phase 2 best hyperparameters
+  - keep Optuna and final full test separate from that screen
+
 ### EXP-195 / EXP-196 / EXP-197
 
 - Date: 2026-05-15
