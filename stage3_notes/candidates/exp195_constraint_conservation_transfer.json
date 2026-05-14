@@ -1,0 +1,137 @@
+{
+  "bundle_id": "BUNDLE-195",
+  "slug": "constraint_conservation_transfer",
+  "title": "Constraint conservation transfer",
+  "family": "representation_alignment",
+  "source_type": "paper+ablation",
+  "launch_mode": "parallel",
+  "status": "ready_for_screening",
+  "task_run_ids": {
+    "user-churn": "EXP195",
+    "user-ltv": "EXP196",
+    "item-incoterms": "EXP197"
+  },
+  "literature": {
+    "queries": [
+      "graph contrastive learning preserve node identity across transformed views",
+      "graph prompt alignment preserve structure during graph-to-text transfer",
+      "knowledge graph alignment invariant preservation sparse basis assignment"
+    ],
+    "papers": [
+      {
+        "title": "GraphCL: Contrastive Self-Supervised Learning of Graph Representations",
+        "url": "https://arxiv.org/abs/2010.13902",
+        "claim": "Contrastive agreement across transformed graph views preserves transferable identity signal.",
+        "relevance": "Direct paper basis for preserving seed-entity identity before and after basis-aligned transfer.",
+        "status": "selected"
+      },
+      {
+        "title": "GraphMAE: Self-Supervised Masked Graph Autoencoders",
+        "url": "https://arxiv.org/abs/2205.10803",
+        "claim": "Better graph-side representations make downstream transfer more stable.",
+        "relevance": "Part 3 is explicitly built on top of the validated Part 1 artifact-backed GNN representation path.",
+        "status": "selected"
+      },
+      {
+        "title": "Heterogeneous Graph Masked Autoencoders",
+        "url": "https://arxiv.org/abs/2208.14957",
+        "claim": "Heterogeneous graph representation quality benefits from structure-aware constraints.",
+        "relevance": "Supports preserving schema/value structural cues during heterogeneous graph-to-token transfer.",
+        "status": "selected"
+      }
+    ]
+  },
+  "evidence": {
+    "prior_experiments": [
+      "EXP066",
+      "EXP069",
+      "EXP192",
+      "EXP193",
+      "EXP194"
+    ],
+    "why_now": "EXP192-family Phase 2 established that the current Part 1 artifact-backed base is scientifically meaningful but mixed: user-ltv and item-incoterms beat full-test reference while user-churn stayed below reference. The next justified step is therefore not another identical rerun, but the documented Part 3 constraint-conservation layer on top of the validated Part 1 base, using the same task-specific best settings for the first fair comparison."
+  },
+  "hypothesis": "If the validated Part 1 path is still losing useful relational signal because basis transfer over-mixes schema and value evidence during graph-to-token projection, then activating the documented constraint-conservation transfer layer under the same task-specific best hyperparameters should preserve more identity and structural evidence without changing the upstream GNN artifact or conflating the result with a new tuning sweep.",
+  "common_overrides": {
+    "basis_lambda_postalign_tok": 0.1,
+    "basis_lambda_entity_identity": 0.05,
+    "basis_entity_identity_temperature": 0.1,
+    "basis_lambda_branch_orth": 0.02,
+    "basis_assignment_topk": 4
+  },
+  "task_overrides": {
+    "user-churn": {
+      "gnn_repr_artifact": "artifacts/gnn_repr/rel-amazon/gnn_repr.pt",
+      "channels": 256,
+      "num_layers": 2,
+      "num_neighbors": 16,
+      "aggr": "mean",
+      "temporal_strategy": "last",
+      "dropout": 0.4480456499617466,
+      "batch_size": 3,
+      "lr": 0.00021677846214357684,
+      "wd": 0.0016973078532467015,
+      "basis_residual_alpha": 0.23783495141695055,
+      "basis_graph_alpha": 0.05552695261768256,
+      "basis_tau": 0.037659918741014,
+      "basis_lambda_tok": 0.31528154175096096,
+      "basis_lambda_g": 2.470540427082327,
+      "basis_lambda_sharp": 0.0009324140221663494,
+      "loss_class_weight": [
+        1.0,
+        1.7768682564439144
+      ]
+    },
+    "user-ltv": {
+      "gnn_repr_artifact": "artifacts/gnn_repr/rel-amazon/gnn_repr.pt",
+      "channels": 256,
+      "num_layers": 2,
+      "num_neighbors": 32,
+      "aggr": "mean",
+      "temporal_strategy": "last",
+      "dropout": 0.1792328642721363,
+      "batch_size": 2,
+      "lr": 0.0008138233922650508,
+      "wd": 1.9777828512462715e-06,
+      "basis_residual_alpha": 0.2624967163228772,
+      "basis_graph_alpha": 0.029898561484575426,
+      "basis_tau": 0.1160833330578411,
+      "basis_lambda_tok": 1.329755409073867,
+      "basis_lambda_g": 0.6746437142284308,
+      "basis_lambda_sharp": 0.020554245520150755,
+      "loss_class_weight": [
+        1.0,
+        2.7180318564408164
+      ]
+    },
+    "item-incoterms": {
+      "gnn_repr_artifact": "artifacts/gnn_repr/rel-salt/gnn_repr.pt",
+      "channels": 256,
+      "num_layers": 2,
+      "num_neighbors": 32,
+      "aggr": "mean",
+      "temporal_strategy": "last",
+      "dropout": 0.4474136752138244,
+      "batch_size": 4,
+      "lr": 0.0008319514671870782,
+      "wd": 0.005727904470799624,
+      "basis_residual_alpha": 0.4229318791183682,
+      "basis_graph_alpha": 0.08918833167339732,
+      "basis_tau": 0.05111938883158829,
+      "basis_lambda_tok": 0.633326877532184,
+      "basis_lambda_g": 0.16149614799999182,
+      "basis_lambda_sharp": 0.025502980701628937,
+      "loss_class_weight": [
+        1.0,
+        1.1783725794347397
+      ]
+    }
+  },
+  "notes": [
+    "This is the first fair comparison candidate after turning the documented Part 3 constraint-conservation knobs into a real code path.",
+    "Do not run Optuna or final full test from this candidate directly.",
+    "The first comparison wave must keep the current task-specific Phase 2 best settings fixed so the comparison is mechanism-level rather than tuning-level.",
+    "Because batch_size is per-rank, later launch preparation should preserve the intended per-rank batch semantics when comparing against the prior 2-rank best-setting runs.",
+    "Scientific interpretation still follows the same Stage 3 rules: subset metrics are continuation gates, user-ltv subset/full-test scale mismatch still applies, and item-incoterms should still be judged scientifically against the full-test reference band near 0.70 rather than the optimistic subset regime."
+  ]
+}
