@@ -1,0 +1,59 @@
+{
+  "candidate": "stage3_notes\\candidates\\exp096_pairwise_autoregressive_hybrid_scorer.json",
+  "tasks": {
+    "user-churn": {
+      "run_id": "EXP096",
+      "log_path": "G:\\RelLLM-2\\Rel-LLM\\stage3_notes\\reports\\log_cache\\stage3-exp096.log",
+      "metrics": {
+        "average_precision": 0.6797240595370794,
+        "accuracy": 0.66015625,
+        "f1": 0.7507163323782235,
+        "roc_auc": 0.6404546695137028
+      },
+      "comparison": {
+        "primary_metric": "roc_auc",
+        "current": 0.6404546695137028,
+        "baseline": 0.6540209032382359,
+        "signed_gain": -0.013566233724533139,
+        "delta_threshold": 0.001,
+        "verdict": "worse"
+      }
+    },
+    "user-ltv": {
+      "run_id": "EXP097",
+      "log_path": "G:\\RelLLM-2\\Rel-LLM\\stage3_notes\\reports\\log_cache\\stage3-exp097.log",
+      "metrics": {
+        "r2": -0.117544729874274,
+        "mae": 78.02303016898222,
+        "rmse": 133.91751528840277
+      },
+      "comparison": {
+        "primary_metric": "mae",
+        "current": 78.02303016898222,
+        "baseline": 79.27257269903086,
+        "signed_gain": 1.2495425300486431,
+        "delta_threshold": 0.001,
+        "verdict": "better"
+      }
+    },
+    "item-incoterms": {
+      "run_id": "EXP098",
+      "log_path": "G:\\RelLLM-2\\Rel-LLM\\stage3_notes\\reports\\log_cache\\stage3-exp098.log",
+      "metrics": {
+        "accuracy": 0.74609375,
+        "macro_f1": 0.18464375065825897,
+        "micro_f1": 0.74609375,
+        "mrr": 0.8337611607142856
+      },
+      "comparison": {
+        "primary_metric": "mrr",
+        "current": 0.8337611607142856,
+        "baseline": 0.8147880873466811,
+        "signed_gain": 0.018973073367604565,
+        "delta_threshold": 0.001,
+        "verdict": "better"
+      }
+    }
+  },
+  "global_verdict": "failed"
+}

@@ -1,0 +1,72 @@
+{
+  "bundle_id": "BUNDLE-078",
+  "slug": "split_local_global_graph_token_packaging",
+  "title": "Split local/global graph-token packaging",
+  "family": "token_consumption",
+  "source_type": "paper+ablation",
+  "status": "stopped",
+  "task_run_ids": {
+    "user-churn": "EXP078",
+    "user-ltv": "EXP079",
+    "item-incoterms": "EXP080"
+  },
+  "literature": {
+    "queries": [
+      "graph llm local global token packaging graph prompt consumption",
+      "graph rag local global evidence token packaging structured prompt llm"
+    ],
+    "papers": [
+      {
+        "title": "G-Retriever: Retrieval-Augmented Generation for Graph Question Answering",
+        "url": "https://arxiv.org/abs/2402.07630",
+        "claim": "Graph prompting works better when relevant structure is exposed in a form the language model can consume, rather than collapsed into one undifferentiated representation.",
+        "relevance": "Supports separating a global summary token from local evidence tokens instead of relying on a flat prompt token sequence.",
+        "status": "selected"
+      },
+      {
+        "title": "Graph Retrieval-Augmented Generation: A Survey",
+        "url": "https://arxiv.org/abs/2408.08921",
+        "claim": "Graph-enhanced generation depends on how evidence is organized and consumed, not only on retrieval or encoder quality.",
+        "relevance": "Supports treating local/global token packaging as a first-class design axis in the graph-to-LLM interface.",
+        "status": "selected"
+      },
+      {
+        "title": "Can we Soft Prompt LLMs for Graph Learning Tasks?",
+        "url": "https://arxiv.org/abs/2402.10359",
+        "claim": "The prompt-side graph interface is a core bottleneck, so modest structural packaging changes can matter when alignment-only changes stall.",
+        "relevance": "Supports a consumption-side packaging test after repeated basis/loss/sampling branches remain globally regressive.",
+        "status": "selected"
+      }
+    ]
+  },
+  "evidence": {
+    "prior_experiments": [
+      "EXP072",
+      "EXP075"
+    ],
+    "why_now": "EXP072 showed that heuristic sampling changes can degrade all three representative tasks, and EXP075 showed that confidence-calibrated basis gating reduced but did not remove the same global regressions. That leaves the token-consumption layer as the next evidence-backed branch: keep the same retrieved/aligned content, but package one explicit global summary token alongside local evidence tokens."
+  },
+  "hypothesis": "The current flat graph-prompt token sequence gives the frozen LLM local evidence tokens but no explicit global summary channel beyond the seed entity token. Inserting one global summary token derived from the local evidence, while preserving the existing local tokens, should make the prompt easier for the LLM to consume without revisiting saturated loss or sampling families.",
+  "common_overrides": {
+    "prompt_split_global_local": true
+  },
+  "task_gpus": {
+    "user-churn": 0,
+    "user-ltv": 5,
+    "item-incoterms": 6
+  },
+  "task_overrides": {
+    "user-churn": {},
+    "user-ltv": {},
+    "item-incoterms": {}
+  },
+  "notes": [
+    "This candidate is token-consumption only: no pretrain, no new loss terms, and no near-duplicate sampling rerun.",
+    "Implementation scope is intentionally narrow: preserve the current seed and local evidence tokens, then insert one explicit global summary token before the local evidence block.",
+    "Launched on 2026-05-07 after syncing the updated main.py/model.py packaging patch plus generated wrappers and launcher to the remote repo and /tmp.",
+    "Selected currently idle GPUs at launch time: user-churn on GPU 0, user-ltv on GPU 5, item-incoterms on GPU 6.",
+    "First orchestrator status check shows all three windows up and logs at remote DB-load stage.",
+    "Completed on 2026-05-07 with global verdict: failed.",
+    "This bundle improved user-churn and user-ltv against the refreshed 512-step strict baselines, but item-incoterms still regressed enough to block promotion."
+  ]
+}

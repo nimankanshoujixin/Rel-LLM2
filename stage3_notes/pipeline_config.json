@@ -1,0 +1,45 @@
+{
+  "remote_repo_root": "/fs/fast/u2021201693/lym/Rel-LLM",
+  "remote_python": "/fs/fast/u2021201693/lym/Rel-LLM/conda/envs/bin/python",
+  "remote_tmp_dir": "/tmp",
+  "remote_ssh": {
+    "name": "lab25211",
+    "user": "u2021201693",
+    "host": "10.10.252.11",
+    "port": 22951
+  },
+  "remote_targets": [
+    {
+      "name": "lab25211",
+      "user": "u2021201693",
+      "host": "10.10.252.11",
+      "port": 22951,
+      "remote_repo_root": "/fs/fast/u2021201693/lym/Rel-LLM",
+      "remote_python": "/fs/fast/u2021201693/lym/Rel-LLM/conda/envs/bin/python",
+      "remote_tmp_dir": "/tmp",
+      "tmux_session": "lymtmux"
+    }
+  ],
+  "tmux_session": "lymtmux",
+  "gpu_idle_max_memory_mb": 2048,
+  "gpu_idle_residual_max_memory_mb": 4096,
+  "gpu_idle_max_utilization": 10,
+  "gpu_exclude": [],
+  "launch_sync_paths": [
+    "tune_hyperparameters.py",
+    "main.py",
+    "model.py",
+    "text_embedder.py",
+    "utils.py"
+  ],
+  "window_prefix": "stage3-exp",
+  "wrapper_output_dir": ".codex_remote/stage3",
+  "candidate_dir": "stage3_notes/candidates",
+  "report_dir": "stage3_notes/reports",
+  "log_cache_dir": "stage3_notes/reports/log_cache",
+  "task_order": [
+    "user-churn",
+    "user-ltv",
+    "item-incoterms"
+  ]
+}

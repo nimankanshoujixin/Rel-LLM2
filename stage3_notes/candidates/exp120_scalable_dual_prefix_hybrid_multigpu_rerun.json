@@ -1,0 +1,79 @@
+{
+  "bundle_id": "BUNDLE-120",
+  "slug": "scalable_dual_prefix_hybrid_multigpu_rerun",
+  "title": "Scalable dual-prefix hybrid multi-GPU rerun",
+  "family": "label_interface",
+  "source_type": "ablation",
+  "status": "resource_blocked",
+  "task_run_ids": {
+    "user-churn": "EXP120",
+    "user-ltv": "EXP121",
+    "item-incoterms": "EXP122"
+  },
+  "literature": {
+    "queries": [
+      "candidate aware multiclass dual prefix multigpu rerun oom fallback shared prefix",
+      "autocomplete multiclass dual prefix ddp rerun memory blocked single gpu"
+    ],
+    "papers": []
+  },
+  "evidence": {
+    "prior_experiments": [
+      "EXP084",
+      "EXP093",
+      "EXP099",
+      "EXP111",
+      "EXP114",
+      "EXP117"
+    ],
+    "why_now": "EXP111 was implementation-blocked. EXP114 and EXP117 then showed that even the corrected and memory-safer dual-prefix family remains resource-blocked on item-incoterms under single-GPU screening. The agreed Stage 3 rule is now that justified OOM-blocked screening reruns may escalate to multi-GPU, so the next correct step is a clean multi-GPU rerun of the same architecture rather than another single-GPU retry."
+  },
+  "hypothesis": "Keeping the same dual-prefix architecture but escalating only the OOM-blocked item-incoterms run to multiple currently idle GPUs should make the bundle runnable without changing its scientific content. This tests whether the family itself is viable once the single-GPU memory bottleneck is removed.",
+  "common_overrides": {
+    "autocomplete_decision_interface": "candidate_pairwise_dual_shared_prefix_hybrid"
+  },
+  "task_overrides": {
+    "user-churn": {},
+    "user-ltv": {},
+    "item-incoterms": {}
+  },
+  "task_gpus": {
+    "item-incoterms": [
+      6,
+      7
+    ]
+  },
+  "notes": [
+    "This is a clean multi-GPU rerun of the same dual-prefix architecture after repeated single-GPU OOM/resource-blocked outcomes on item-incoterms.",
+    "Keep user-churn and user-ltv on routine single-GPU screening unless the launcher needs to reassign them to other idle GPUs.",
+    "Do not mix any new loss, sampling, packaging, or pretrain changes into this rerun.",
+    "Launched on 2026-05-08 through the local Stage 3 launcher.",
+    "Resolved idle-GPU placement at launch time: user-churn -> lab25211 GPU 0, user-ltv -> lab25211 GPU 5, item-incoterms -> lab25211 GPUs 6,7.",
+    "First stable orchestrator status check after launch showed all three windows up and item-incoterms running on the intended two-GPU allocation.",
+    "Completed on 2026-05-08 as resource-blocked rather than scientifically failed: user-churn and user-ltv finished, but item-incoterms still ran out of memory before its first evaluation even under a 2-GPU DDP launch.",
+    "This means the dual-prefix full-candidate raw-label autoregressive recursion is not just single-GPU-tight; it remains practically non-viable in its current form and should not be extended with more near-duplicate reruns."
+  ],
+  "task_launches": {
+    "user-churn": {
+      "target": "lab25211",
+      "gpu": 0,
+      "window_name": "stage3-exp120",
+      "baseline_default_gpu": 5
+    },
+    "user-ltv": {
+      "target": "lab25211",
+      "gpu": 5,
+      "window_name": "stage3-exp121",
+      "baseline_default_gpu": 6
+    },
+    "item-incoterms": {
+      "target": "lab25211",
+      "gpu": [
+        6,
+        7
+      ],
+      "window_name": "stage3-exp122",
+      "baseline_default_gpu": 7
+    }
+  }
+}

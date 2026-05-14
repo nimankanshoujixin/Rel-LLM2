@@ -1,0 +1,96 @@
+{
+  "bundle_id": "BUNDLE-132",
+  "slug": "candidate_pairwise_positional_interaction_replay",
+  "title": "Candidate pairwise positional interaction replay",
+  "family": "label_interface",
+  "source_type": "ablation",
+  "launch_mode": "serial_batch_equivalent",
+  "status": "implementation-blocked",
+  "task_run_ids": {
+    "user-churn": "EXP132",
+    "user-ltv": "EXP133",
+    "item-incoterms": "EXP134"
+  },
+  "literature": {
+    "queries": [
+      "label token order pooling candidate pairwise scorer scalable multiclass graph llm",
+      "cheap token sequence label encoder pairwise ranking multiclass candidate aware scorer"
+    ],
+    "papers": [
+      {
+        "title": "",
+        "url": "",
+        "claim": "",
+        "relevance": "",
+        "status": "not_required_for_ablation"
+      }
+    ]
+  },
+  "evidence": {
+    "prior_experiments": [
+      "EXP099",
+      "EXP126",
+      "EXP129"
+    ],
+    "why_now": "EXP129 showed that removing the autoregressive path restores acceptable throughput but collapses item-incoterms, while EXP126 showed that keeping autoregressive candidate-token reranking is still too expensive even after the training-memory fix. The remaining justified step is to inject a cheap token-order-aware label encoder into the pairwise scorer so it can keep more candidate-token structure without returning to autoregressive scoring."
+  },
+  "hypothesis": "If the main weakness of the fast pairwise scorer is that its label representations throw away token order by mean-pooling candidate tokens, then replacing that mean pool with a tiny position-aware attention pool should recover part of the candidate-token signal while keeping the scorer in the scalable non-autoregressive regime.",
+  "common_overrides": {
+    "autocomplete_decision_interface": "candidate_pairwise_positional_interaction"
+  },
+  "task_overrides": {
+    "user-churn": {},
+    "user-ltv": {},
+    "item-incoterms": {}
+  },
+  "notes": [
+    "Keep Stage 3 finetune-only; do not introduce pretrain, loss-family changes, sampling changes, or packaging changes.",
+    "This candidate changes only the label-side representation inside the pairwise scorer.",
+    "The intended benefit is to recover some token-order sensitivity from the hybrid line without reintroducing autoregressive candidate rollout.",
+    "Use serial_batch_equivalent scheduling by default.",
+    "Launched on 2026-05-09 through the local Stage 3 launcher.",
+    "Resolved serial batch-equivalent placement at launch time: user-churn -> lab25211 GPUs 5,6 with per-rank batch 2; user-ltv -> lab25211 GPUs 5,6 with per-rank batch 1; item-incoterms -> lab25211 GPUs 5,6 with per-rank batch 2.",
+    "First orchestrator status check after launch showed the serial controller active and the first representative-task window up in DB-load startup; later tasks remained queued behind the controller as expected.",
+    "Completed on 2026-05-09 as implementation-blocked rather than scientifically failed.",
+    "user-churn finished strongly and user-ltv reached a runnable completion, but item-incoterms crashed at model initialization because the new positional label pooler referenced Tanh before it was imported.",
+    "Do not use EXP132 as scientific evidence against the positional-interaction family; rerun cleanly after the import fix."
+  ],
+  "task_launches": {
+    "user-churn": {
+      "target": "lab25211",
+      "gpu": [
+        5,
+        6
+      ],
+      "window_name": "stage3-exp132",
+      "baseline_default_gpu": 5,
+      "per_rank_batch_size": 2,
+      "launch_world_size": 2,
+      "launch_mode": "serial_batch_equivalent"
+    },
+    "user-ltv": {
+      "target": "lab25211",
+      "gpu": [
+        5,
+        6
+      ],
+      "window_name": "stage3-exp133",
+      "baseline_default_gpu": 6,
+      "per_rank_batch_size": 1,
+      "launch_world_size": 2,
+      "launch_mode": "serial_batch_equivalent"
+    },
+    "item-incoterms": {
+      "target": "lab25211",
+      "gpu": [
+        5,
+        6
+      ],
+      "window_name": "stage3-exp134",
+      "baseline_default_gpu": 7,
+      "per_rank_batch_size": 2,
+      "launch_world_size": 2,
+      "launch_mode": "serial_batch_equivalent"
+    }
+  }
+}

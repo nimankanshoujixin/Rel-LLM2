@@ -1,0 +1,76 @@
+{
+  "bundle_id": "BUNDLE-072",
+  "slug": "bridge_route_sampling",
+  "title": "Bridge- and route-aware sampling",
+  "family": "constraint_aware_sampling",
+  "source_type": "paper+ablation",
+  "status": "stopped",
+  "task_run_ids": {
+    "user-churn": "EXP072",
+    "user-ltv": "EXP073",
+    "item-incoterms": "EXP074"
+  },
+  "literature": {
+    "queries": [
+      "graph retrieval route aware sampling bridge table evidence graph llm",
+      "graph rag route aware evidence selection bridge table retention structured reasoning"
+    ],
+    "papers": [
+      {
+        "title": "G-Retriever: Retrieval-Augmented Generation for Graph Question Answering",
+        "url": "https://arxiv.org/abs/2402.07630",
+        "claim": "A single compressed graph prompt can lose structural fidelity, so selecting the right evidence subgraph is often more important than adding more prompt-side decoration.",
+        "relevance": "Supports moving from repeated alignment-loss failures to a graph-evidence selection change.",
+        "status": "selected"
+      },
+      {
+        "title": "Graph Retrieval-Augmented Generation: A Survey",
+        "url": "https://arxiv.org/abs/2408.08921",
+        "claim": "Graph indexing, route-aware retrieval, and evidence organization are primary design axes for graph-enhanced generation.",
+        "relevance": "Supports a route- and bridge-aware sampling bundle as the next cross-task branch after loss-family saturation.",
+        "status": "selected"
+      },
+      {
+        "title": "Can we Soft Prompt LLMs for Graph Learning Tasks?",
+        "url": "https://arxiv.org/abs/2402.10359",
+        "claim": "Prompt-side graph quality depends on preserving useful structure before projection into the LLM prompt space.",
+        "relevance": "Supports treating better evidence exposure, not more alignment penalties, as the next likely bottleneck.",
+        "status": "selected"
+      }
+    ]
+  },
+  "evidence": {
+    "prior_experiments": [
+      "EXP045",
+      "EXP060",
+      "EXP063",
+      "EXP066",
+      "EXP069"
+    ],
+    "why_now": "Uniform neighbor pruning already failed in EXP045, but two successive route-aware conservative losses also failed with the same representative-task pattern. The next stronger paper-backed move is therefore not another near-duplicate loss tweak, but a more selective prompt-side evidence exposure change inside the sampling layer."
+  },
+  "hypothesis": "The current prompt-side evidence path is still exposing structurally weak or noisy neighborhoods because recursive sampling serializes whatever first-hop nodes survive the loader without prioritizing bridge-mediated or stable route evidence. A bridge- and route-aware sampler that deterministically preserves high-value route continuations inside the already loaded batch subgraph should improve cross-task stability more safely than adding another alignment loss.",
+  "common_overrides": {
+    "prompt_sampling_strategy": "bridge_route",
+    "prompt_sampling_hops": 2,
+    "prompt_sampling_topk_per_type": 2
+  },
+  "task_gpus": {
+    "user-churn": 0,
+    "user-ltv": 5,
+    "item-incoterms": 6
+  },
+  "task_overrides": {
+    "user-churn": {},
+    "user-ltv": {},
+    "item-incoterms": {}
+  },
+  "notes": [
+    "This candidate shifts Stage 3 from constraint-aware loss to constraint-aware sampling.",
+    "Intended implementation hook: replace purely type-avoidant recursive prompt sampling with deterministic bridge- and route-aware retention inside the existing batch subgraph.",
+    "Do not relaunch uniform neighbor pruning; this candidate must preserve evidence quality rather than just shrink prompt volume.",
+    "Launched on 2026-05-07 after syncing the updated main.py/model.py sampling patch plus generated wrappers and launcher to the remote repo and /tmp.",
+    "Completed on 2026-05-07 with global verdict: failed.",
+    "All three representative tasks regressed versus the refreshed 512-step strict baselines, so treat this first constraint-aware sampling branch as scientific failure rather than an implementation issue."
+  ]
+}

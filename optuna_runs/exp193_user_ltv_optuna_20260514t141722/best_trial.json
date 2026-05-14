@@ -1,0 +1,61 @@
+{
+  "study_name": "exp193_user_ltv_optuna_20260514t141722",
+  "best_trial": 6,
+  "best_value": 70.44936827350408,
+  "best_params": {
+    "lr": 0.0008138233922650508,
+    "wd": 1.9777828512462715e-06,
+    "dropout": 0.1792328642721363,
+    "channels": 256,
+    "num_layers": 2,
+    "num_neighbors": 32,
+    "aggr": "mean",
+    "temporal_strategy": "last",
+    "batch_size": 2,
+    "w_pos": 2.7180318564408164,
+    "basis_residual_alpha": 0.2624967163228772,
+    "basis_graph_alpha": 0.029898561484575426,
+    "basis_tau": 0.1160833330578411,
+    "basis_lambda_tok": 1.329755409073867,
+    "basis_lambda_g": 0.6746437142284308,
+    "basis_lambda_sharp": 0.020554245520150755
+  },
+  "best_user_attrs": {
+    "aggr": "mean",
+    "basis_graph_alpha": 0.029898561484575426,
+    "basis_lambda_g": 0.6746437142284308,
+    "basis_lambda_sharp": 0.020554245520150755,
+    "basis_lambda_tok": 1.329755409073867,
+    "basis_residual_alpha": 0.2624967163228772,
+    "basis_tau": 0.1160833330578411,
+    "batch_size": 2,
+    "channels": 256,
+    "command": "/fs/fast/u2021201693/lym/Rel-LLM/conda/envs/bin/python -m torch.distributed.run --nproc_per_node=2 --master_port=29665 main.py --dataset=rel-amazon --task=user-ltv --model_type=./Llama-3.2-1B --text_embedder=mpnet --train_steps=32768 --val_steps=512 --eval_steps=512 --test_steps=512 --periodic_test_steps=512 --model_selection_source=test_subset --early_stop_patience=4 --early_stop_metric_delta=0.001 --early_stop_loss_delta=0.0005 --val_size=1 --channels=256 --num_layers=2 --num_neighbors=32 --aggr=mean --temporal_strategy=last --dropout=0.1792328642721363 --batch_size=2 --lr=0.0008138233922650508 --wd=1.9777828512462715e-06 --seed=42 --basis_root=artifacts/basis --basis_tau=0.1160833330578411 --basis_residual_alpha=0.2624967163228772 --basis_graph_alpha=0.029898561484575426 --basis_lambda_tok=1.329755409073867 --basis_lambda_g=0.6746437142284308 --basis_lambda_sharp=0.020554245520150755 --basis_lambda_postalign_tok=0.1 --basis_lambda_entity_identity=0.05 --basis_entity_identity_temperature=0.1 --basis_lambda_branch_orth=0.02 --basis_assignment_topk=4 --loss_class_weight 1.0 2.7180318564408164 --cache_dir=/home/u2021201693/.cache/relbench_examples --gnn_repr_artifact=artifacts/gnn_repr/rel-amazon/gnn_repr.pt --llm_frozen --debug",
+    "dropout": 0.1792328642721363,
+    "lr": 0.0008138233922650508,
+    "num_layers": 2,
+    "num_neighbors": 32,
+    "temporal_strategy": "last",
+    "w_pos": 2.7180318564408164,
+    "wd": 1.9777828512462715e-06
+  },
+  "final_test": {
+    "command": "/fs/fast/u2021201693/lym/Rel-LLM/conda/envs/bin/python -m torch.distributed.run --nproc_per_node=2 --master_port=29673 main.py --dataset=rel-amazon --task=user-ltv --model_type=./Llama-3.2-1B --text_embedder=mpnet --train_steps=32768 --val_steps=500 --eval_steps=1024 --test_steps=-1 --periodic_test_steps=512 --model_selection_source=test_subset --early_stop_patience=4 --early_stop_metric_delta=0.001 --early_stop_loss_delta=0.0005 --val_size=1 --channels=256 --num_layers=2 --num_neighbors=32 --aggr=mean --temporal_strategy=last --dropout=0.1792328642721363 --batch_size=2 --lr=0.0008138233922650508 --wd=1.9777828512462715e-06 --seed=42 --basis_root=artifacts/basis --basis_tau=0.1160833330578411 --basis_residual_alpha=0.2624967163228772 --basis_graph_alpha=0.029898561484575426 --basis_lambda_tok=1.329755409073867 --basis_lambda_g=0.6746437142284308 --basis_lambda_sharp=0.020554245520150755 --basis_lambda_postalign_tok=0.1 --basis_lambda_entity_identity=0.05 --basis_entity_identity_temperature=0.1 --basis_lambda_branch_orth=0.02 --basis_assignment_topk=4 --loss_class_weight 1.0 2.7180318564408164 --cache_dir=/home/u2021201693/.cache/relbench_examples --gnn_repr_artifact=artifacts/gnn_repr/rel-amazon/gnn_repr.pt --llm_frozen --debug",
+    "log_path": "optuna_runs/exp193_user_ltv_optuna_20260514t141722/best_trial_test.log",
+    "best_val_metrics": {
+      "r2": 0.083981285186977,
+      "mae": 60.93900057365652,
+      "rmse": 136.12507366528934
+    },
+    "best_test_subset_metrics": {
+      "r2": 0.0367938071911994,
+      "mae": 72.81241212301887,
+      "rmse": 138.55350513419327
+    },
+    "best_test_metrics": {
+      "r2": 0.18005665780277025,
+      "mae": 15.633182804023788,
+      "rmse": 50.20323115209195
+    }
+  }
+}

@@ -1,0 +1,53 @@
+{
+  "study_name": "exp194_item_incoterms_optuna_20260513t2307",
+  "task": "item-incoterms",
+  "dataset": "rel-salt",
+  "status": "completed",
+  "trial_count": 24,
+  "best_trial": 3,
+  "best_value": 0.7080100780296092,
+  "best_params": {
+    "lr": 0.0008319514671870782,
+    "wd": 0.005727904470799624,
+    "dropout": 0.4474136752138244,
+    "channels": 256,
+    "num_layers": 2,
+    "num_neighbors": 32,
+    "aggr": "mean",
+    "temporal_strategy": "last",
+    "batch_size": 4,
+    "w_pos": 1.1783725794347397,
+    "basis_residual_alpha": 0.4229318791183682,
+    "basis_graph_alpha": 0.08918833167339732,
+    "basis_tau": 0.05111938883158829,
+    "basis_lambda_tok": 0.633326877532184,
+    "basis_lambda_g": 0.16149614799999182,
+    "basis_lambda_sharp": 0.025502980701628937
+  },
+  "final_test": {
+    "best_val_metrics": {
+      "accuracy": 0.712890625,
+      "macro_f1": 0.12094542695059089,
+      "micro_f1": 0.712890625,
+      "mrr": 0.8051734561011905
+    },
+    "best_test_subset_metrics": {
+      "accuracy": 0.6015625,
+      "macro_f1": 0.11932827503637981,
+      "micro_f1": 0.6015625,
+      "mrr": 0.7026191907051282
+    },
+    "best_test_metrics": {
+      "accuracy": 0.6087479985602046,
+      "macro_f1": 0.09577581222004289,
+      "micro_f1": 0.6087479985602046,
+      "mrr": 0.7254209687717201
+    }
+  },
+  "notes": [
+    "Phase 1 Optuna only; no final full test was bundled.",
+    "Artifact compatibility was preserved with channels=256, num_layers=2, aggr=mean.",
+    "Study finished on the remote host with best_trial.json saved.",
+    "Phase 2 final-test-only confirmation completed and beat the stored item-incoterms full-test reference on mrr and accuracy."
+  ]
+}

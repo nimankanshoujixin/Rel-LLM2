@@ -1,0 +1,122 @@
+{
+  "bundle_id": "BUNDLE-183",
+  "slug": "sample_candidate_guided_prompt_routing",
+  "title": "Sample-conditioned candidate-set prompt evidence routing",
+  "family": "candidate_aware_evidence_routing",
+  "source_type": "paper+ablation",
+  "launch_mode": "packed_batch_equivalent",
+  "status": "failed",
+  "gpu_exclude": [
+    0
+  ],
+  "task_cost_weights": {
+    "user-churn": 1.0,
+    "user-ltv": 1.2,
+    "item-incoterms": 2.0
+  },
+  "task_run_ids": {
+    "user-churn": "EXP183",
+    "user-ltv": "EXP184",
+    "item-incoterms": "EXP185"
+  },
+  "literature": {
+    "queries": [
+      "G-Retriever query relevant subgraph retrieval graph prompt",
+      "GraphRAG query focused graph retrieval evidence selection"
+    ],
+    "papers": [
+      {
+        "title": "G-Retriever: Retrieval-Augmented Generation for Graph Question Answering",
+        "url": "https://arxiv.org/abs/2402.07630",
+        "claim": "Graph prompt evidence should be retrieved according to the query rather than consumed as a generic compressed graph context.",
+        "relevance": "EXP180 used only a global candidate-set query. A sample-conditioned candidate query is closer to query-focused graph retrieval while preserving the same prompt length and scorer.",
+        "status": "selected"
+      },
+      {
+        "title": "Graph Retrieval-Augmented Generation: A Survey",
+        "url": "https://arxiv.org/abs/2408.08921",
+        "claim": "GraphRAG separates graph-guided retrieval from generation and emphasizes query-relevant evidence selection.",
+        "relevance": "Stage 3 needs a different information path from final scorer variants. Query-focused evidence routing is still Stage4-compatible through proxy candidate-ranking/value-selection episodes.",
+        "status": "selected"
+      }
+    ]
+  },
+  "evidence": {
+    "prior_experiments": [
+      "EXP099",
+      "EXP108",
+      "EXP162",
+      "EXP168",
+      "EXP171",
+      "EXP174",
+      "EXP177",
+      "EXP180"
+    ],
+    "why_now": "EXP180 failed fixed screening but reached item-incoterms mrr=0.7432317302922772 with acceptable throughput, above the repeated scorer-collapse bands. Its routing query was candidate-set-only and therefore could not distinguish which candidate-relevant evidence mattered for the current sample. Query-focused GraphRAG/G-Retriever evidence plus EXP180's retune-plausible signal justify one non-near-duplicate routing follow-up before retiring this evidence-routing branch."
+  },
+  "hypothesis": "For autocomplete multiclass tasks, candidate-set-only prompt routing is too generic. Combining the seed/sample prompt token representation with the candidate-set query should route existing graph evidence toward evidence that is both candidate-relevant and sample-relevant. This keeps Stage 3 finetune-only, does not inflate prompt length, does not change the scorer, avoids manual top-k/token-budget scans, and preserves a Stage 4 proxy candidate-ranking training story.",
+  "common_overrides": {
+    "prompt_sample_candidate_guided_routing": true
+  },
+  "task_overrides": {
+    "user-churn": {},
+    "user-ltv": {},
+    "item-incoterms": {}
+  },
+  "notes": [
+    "Draft created after EXP180 finalized failed but retune-plausible.",
+    "Keep Stage 3 finetune-only; do not use --pretrain.",
+    "This is not a scorer near-variant: it changes only graph prompt evidence ordering before frozen-LLM consumption.",
+    "Do not scan routing top-k, prompt token budget, residual scales, rank margins, auxiliary weights, batching, or chunk sizes.",
+    "Implementation plan: reuse EXP180 candidate-set query, add seed/sample prompt representation from the existing sample_head, route existing graph prompt tokens by the normalized sum of sample and candidate queries, and keep token count unchanged.",
+    "Implementation added on 2026-05-11 via prompt_sample_candidate_guided_routing.",
+    "Pre-launch validation completed on 2026-05-11: py_compile, git diff --check, JSON validation, and remote item-incoterms shape/throughput sanity all passed.",
+    "Remote sanity check completed on 2026-05-11: a 64-step item-incoterms finetune-only run on lab25211 GPU6 completed cleanly, reached roughly 6.2 train step/s with batch_size=4 (about 24.8 effective train items/sec), and eval/test ran around 12.1 it/s with val_size=1.",
+    "Final metrics: EXP183 user-churn roc_auc=0.6877176117513276; EXP184 user-ltv mae=79.40659794325009; EXP185 item-incoterms mrr=0.6782075427827381.",
+    "Final verdict under replay-aware effective deltas: user-churn better, user-ltv neutral, item-incoterms worse; global verdict failed.",
+    "Throughput was acceptable: EXP185 ran on two ranks with per-rank batch 2 and visible training around 6.5 step/s, about 26 effective train items/sec; final test ran around 12.17 it/s with val_size=1.",
+    "Interpretation: adding sample/seed conditioning to the candidate-set routing query hurt salt-side ranking and returned item-incoterms to the known weak collapse band, despite improving user-churn. This is not a promotable candidate and is weaker than EXP180's candidate-set-only routing signal.",
+    "Search-space consequence: do not pursue sample-conditioned prompt routing as the next manual branch. If continuing the evidence-routing line, preserve candidate-set-only guidance and reduce order destruction by routing metadata groups/blocks rather than individual prompt tokens; no top-k, token-budget, residual-scale, or scorer-neighbor scans."
+  ],
+  "task_launches": {
+    "user-churn": {
+      "target": "lab25211",
+      "gpu": [
+        4,
+        6
+      ],
+      "window_name": "stage3-exp183",
+      "baseline_default_gpu": 5,
+      "per_rank_batch_size": 2,
+      "launch_world_size": 2,
+      "launch_mode": "packed_batch_equivalent",
+      "launch_wave": 0
+    },
+    "user-ltv": {
+      "target": "lab25211",
+      "gpu": [
+        4,
+        6
+      ],
+      "window_name": "stage3-exp184",
+      "baseline_default_gpu": 6,
+      "per_rank_batch_size": 1,
+      "launch_world_size": 2,
+      "launch_mode": "packed_batch_equivalent",
+      "launch_wave": 1
+    },
+    "item-incoterms": {
+      "target": "lab25211",
+      "gpu": [
+        4,
+        6
+      ],
+      "window_name": "stage3-exp185",
+      "baseline_default_gpu": 7,
+      "per_rank_batch_size": 2,
+      "launch_world_size": 2,
+      "launch_mode": "packed_batch_equivalent",
+      "launch_wave": 2
+    }
+  }
+}

@@ -1,0 +1,50 @@
+{
+  "study_name": "exp193_user_ltv_optuna_20260514t141722",
+  "task": "user-ltv",
+  "dataset": "rel-amazon",
+  "status": "completed",
+  "trial_count": 14,
+  "best_trial": 6,
+  "best_value": 70.44936827350408,
+  "best_params": {
+    "lr": 0.0008138233922650508,
+    "wd": 1.9777828512462715e-06,
+    "dropout": 0.1792328642721363,
+    "channels": 256,
+    "num_layers": 2,
+    "num_neighbors": 32,
+    "aggr": "mean",
+    "temporal_strategy": "last",
+    "batch_size": 2,
+    "w_pos": 2.7180318564408164,
+    "basis_residual_alpha": 0.2624967163228772,
+    "basis_graph_alpha": 0.029898561484575426,
+    "basis_tau": 0.1160833330578411,
+    "basis_lambda_tok": 1.329755409073867,
+    "basis_lambda_g": 0.6746437142284308,
+    "basis_lambda_sharp": 0.020554245520150755
+  },
+  "final_test": {
+    "best_val_metrics": {
+      "r2": 0.083981285186977,
+      "mae": 60.93900057365652,
+      "rmse": 136.12507366528934
+    },
+    "best_test_subset_metrics": {
+      "r2": 0.0367938071911994,
+      "mae": 72.81241212301887,
+      "rmse": 138.55350513419327
+    },
+    "best_test_metrics": {
+      "r2": 0.18005665780277025,
+      "mae": 15.633182804023788,
+      "rmse": 50.20323115209195
+    }
+  },
+  "notes": [
+    "Phase 1 Optuna only; no final full test was bundled.",
+    "Artifact compatibility was preserved with channels=256, num_layers=2, aggr=mean.",
+    "Study finished on the remote host with best_trial.json saved.",
+    "Phase 2 final-test-only confirmation completed and beat the stored user-ltv full-test reference on mae and rmse."
+  ]
+}

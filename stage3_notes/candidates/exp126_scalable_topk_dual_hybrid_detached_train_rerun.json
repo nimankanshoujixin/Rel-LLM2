@@ -1,0 +1,70 @@
+{
+  "bundle_id": "BUNDLE-126",
+  "slug": "scalable_topk_dual_hybrid_detached_train_rerun",
+  "title": "Scalable top-k dual hybrid detached-train rerun",
+  "family": "label_interface",
+  "source_type": "ablation",
+  "status": "stopped",
+  "task_run_ids": {
+    "user-churn": "EXP126",
+    "user-ltv": "EXP127",
+    "item-incoterms": "EXP128"
+  },
+  "literature": {
+    "queries": [
+      "frozen llm candidate reranker detached training feature shortlist rerank multiclass",
+      "candidate aware shortlist reranker train detached inference feature graph llm"
+    ],
+    "papers": []
+  },
+  "evidence": {
+    "prior_experiments": [
+      "EXP093",
+      "EXP099",
+      "EXP120",
+      "EXP123"
+    ],
+    "why_now": "EXP123 kept the intended shortlist-then-rerank structure but still OOMed on item-incoterms during training. The remaining memory pressure comes from retaining the autoregressive rerank graph through the frozen LLM. Because EXP093 already showed the pairwise scorer itself is trainable and useful, the next justified rerun is to keep the same top-k dual reranker at inference time while detaching the autoregressive rerank branch during training so it behaves as a frozen candidate-token feature rather than a backpropagated path."
+  },
+  "hypothesis": "If the top-k dual autoregressive rerank branch is detached during training, the model can preserve the shortlist-based candidate-token signal at scoring time while removing the training-time activation blowup that still blocked EXP123 on item-incoterms. This should keep the scalable shortlist design but shift the memory burden back toward the already-runnable pairwise path.",
+  "common_overrides": {
+    "autocomplete_decision_interface": "candidate_pairwise_topk_dual_hybrid",
+    "autocomplete_candidate_topk": 4
+  },
+  "task_overrides": {
+    "user-churn": {},
+    "user-ltv": {},
+    "item-incoterms": {}
+  },
+  "notes": [
+    "Keep Stage 3 finetune-only; do not introduce pretrain, loss-family changes, sampling changes, or packaging changes.",
+    "This is a clean rerun of the same shortlist architecture after changing only the training-time gradient flow of the autoregressive rerank branch.",
+    "At inference time the scorer still uses the top-k dual token reranker; the memory reduction is specifically in the training path.",
+    "Launched on 2026-05-08 through the local Stage 3 launcher.",
+    "Resolved idle-GPU placement at launch time: user-churn -> lab25211 GPU 0, user-ltv -> lab25211 GPU 5, item-incoterms -> lab25211 GPU 6.",
+    "First stable orchestrator status check after launch showed all three windows up and logs advancing through DB-load startup.",
+    "Completed on 2026-05-09 with global verdict: failed.",
+    "user-churn finished above baseline, but user-ltv finished below baseline and item-incoterms remained below the strict MRR baseline at its latest completed evaluation.",
+    "item-incoterms was killed early under the new monitoring exception because it had become the only remaining active task, its throughput was structurally abnormal relative to the other representative tasks, and its latest completed evaluation at step 3072 still left MRR below the strict baseline."
+  ],
+  "task_launches": {
+    "user-churn": {
+      "target": "lab25211",
+      "gpu": 0,
+      "window_name": "stage3-exp126",
+      "baseline_default_gpu": 5
+    },
+    "user-ltv": {
+      "target": "lab25211",
+      "gpu": 5,
+      "window_name": "stage3-exp127",
+      "baseline_default_gpu": 6
+    },
+    "item-incoterms": {
+      "target": "lab25211",
+      "gpu": 6,
+      "window_name": "stage3-exp128",
+      "baseline_default_gpu": 7
+    }
+  }
+}

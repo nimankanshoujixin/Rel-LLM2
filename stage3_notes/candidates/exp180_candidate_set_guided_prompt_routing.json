@@ -1,0 +1,127 @@
+{
+  "bundle_id": "BUNDLE-180",
+  "slug": "candidate_set_guided_prompt_routing",
+  "title": "Candidate-set guided prompt evidence routing",
+  "family": "candidate_aware_evidence_routing",
+  "source_type": "paper+ablation",
+  "launch_mode": "packed_batch_equivalent",
+  "status": "failed",
+  "gpu_exclude": [
+    0
+  ],
+  "task_cost_weights": {
+    "user-churn": 1.0,
+    "user-ltv": 1.2,
+    "item-incoterms": 2.0
+  },
+  "task_run_ids": {
+    "user-churn": "EXP180",
+    "user-ltv": "EXP181",
+    "item-incoterms": "EXP182"
+  },
+  "literature": {
+    "queries": [
+      "G-Retriever graph question answering relevant subgraph retrieval graph prompt",
+      "GraphRAG graph-guided retrieval candidate evidence selection structured data"
+    ],
+    "papers": [
+      {
+        "title": "G-Retriever: Retrieval-Augmented Generation for Graph Question Answering",
+        "url": "https://arxiv.org/abs/2402.07630",
+        "claim": "Retrieving task-relevant graph structure can reduce information loss compared with relying on a single compressed graph representation.",
+        "relevance": "Stage 3 scorer replacements repeatedly failed to preserve salt-side candidate ranking. This motivates moving candidate information earlier, into which schema/neighborhood evidence is routed into graph prompt tokens.",
+        "status": "selected"
+      },
+      {
+        "title": "Graph Retrieval-Augmented Generation: A Survey",
+        "url": "https://arxiv.org/abs/2408.08921",
+        "claim": "GraphRAG systems organize improvements around graph indexing, graph-guided retrieval, and graph-enhanced generation.",
+        "relevance": "The recent Stage 3 line has over-weighted graph-enhanced candidate scoring. A graph-guided evidence-routing candidate is a different information path while keeping the frozen LLM and finetune-only protocol.",
+        "status": "selected"
+      }
+    ]
+  },
+  "evidence": {
+    "prior_experiments": [
+      "EXP099",
+      "EXP108",
+      "EXP123",
+      "EXP126",
+      "EXP156",
+      "EXP159",
+      "EXP168",
+      "EXP171",
+      "EXP174",
+      "EXP177"
+    ],
+    "why_now": "The post-EXP099 scalable scorer line has repeatedly failed: token-stat and pooled-label families collapsed, baseline residuals softened but did not solve the salt-side failure, naive late interaction and Poly-encoder variants stayed far below the strict baseline, and shared-prefix implementation rewrites either lost score-surface behavior or were not acceptable as final paths. The next non-near-duplicate Stage4-compatible move is to stop only changing the final scorer and instead make the graph prompt evidence candidate-aware before the frozen LLM consumes it."
+  },
+  "hypothesis": "For autocomplete multiclass tasks, the current prompt may route generic seed/neighborhood evidence that is useful for Amazon controls but insufficient for salt-side candidate discrimination. A candidate-set guided prompt routing mechanism should score available prompt/neighborhood tokens against the candidate label set, keep a small candidate-relevant evidence subset, and feed the existing scorer a prompt with more discriminative relational evidence. This remains Stage 3 finetune-only and Stage4-compatible because candidate-set relevance can later be trained from proxy categorical-value ranking episodes, without target-database-only fixed heads or exhaustive O(L*C) autoregressive rollout.",
+  "common_overrides": {
+    "prompt_candidate_guided_routing": true
+  },
+  "task_overrides": {
+    "user-churn": {},
+    "user-ltv": {},
+    "item-incoterms": {}
+  },
+  "notes": [
+    "Implementation added on 2026-05-11: prompt_candidate_guided_routing builds a compact candidate-set query from class-id and raw-label text embeddings, then reorders existing graph prompt evidence groups before LLM encoding without prompt-length inflation or scorer changes.",
+    "Keep Stage 3 finetune-only; do not use --pretrain.",
+    "This is intentionally not another scorer near-variant: it changes the information path before prompt consumption by routing graph evidence according to the candidate set.",
+    "Do not scan routing top-k or token budgets manually. Add any necessary knob for future Optuna only after the mechanism earns budget.",
+    "Implementation sketch: build a compact candidate-set query from class-id/raw-label text embeddings, compute relevance for existing graph prompt tokens or token metadata groups, and reorder or gate prompt evidence before LLM encoding while preserving batch-equivalent screening protocol.",
+    "The implementation must stay non-O(L*C) in LLM rollout; candidate text embedding and token routing should be tensorized and cheap relative to one prompt forward.",
+    "Pre-launch validation completed on 2026-05-11: py_compile, git diff --check, JSON validation, and remote item-incoterms shape/throughput sanity check all passed.",
+    "Remote sanity check completed on 2026-05-11: a 64-step item-incoterms finetune-only run on lab25211 GPU7 completed cleanly, reached roughly 6.1 train step/s with batch_size=4 (about 24.4 effective train items/sec), and eval/test ran around 12.3 it/s with val_size=1.",
+    "Exclude GPU0 for this candidate only because recent EXP162 evidence showed a pre-eval SIGTERM when user-churn used GPU0 as local_rank 0; global pipeline_config keeps gpu_exclude empty.",
+    "If implementation devolves into prompt-length inflation, scorer residual scaling, token-stat near-neighbor features, or batching/chunk-size tuning, retire this draft rather than launch it.",
+    "Final metrics: EXP180 user-churn roc_auc=0.6846461354497603; EXP181 user-ltv mae=79.0516936504784; EXP182 item-incoterms mrr=0.7432317302922772.",
+    "Final verdict under replay-aware effective deltas: user-churn better, user-ltv neutral, item-incoterms worse; global verdict failed.",
+    "Throughput was acceptable: EXP182 ran on four ranks with per-rank batch 1 at roughly 6.8 train step/s, about 27.2 effective train items/sec, and final test ran around 12.16 it/s.",
+    "Interpretation: candidate-set prompt routing improved salt-side ranking over the repeated 0.6786/0.699/0.704 collapse bands and stayed Stage4-compatible, so it is a fixed-screen failed but retune-plausible mechanism signal; it is not promotable and should not be followed by manual routing/token-budget scans."
+  ],
+  "task_launches": {
+    "user-churn": {
+      "target": "lab25211",
+      "gpu": [
+        4,
+        5
+      ],
+      "window_name": "stage3-exp180",
+      "baseline_default_gpu": 5,
+      "per_rank_batch_size": 2,
+      "launch_world_size": 2,
+      "launch_mode": "packed_batch_equivalent",
+      "launch_wave": 0
+    },
+    "user-ltv": {
+      "target": "lab25211",
+      "gpu": [
+        6,
+        7
+      ],
+      "window_name": "stage3-exp181",
+      "baseline_default_gpu": 6,
+      "per_rank_batch_size": 1,
+      "launch_world_size": 2,
+      "launch_mode": "packed_batch_equivalent",
+      "launch_wave": 0
+    },
+    "item-incoterms": {
+      "target": "lab25211",
+      "gpu": [
+        4,
+        5,
+        6,
+        7
+      ],
+      "window_name": "stage3-exp182",
+      "baseline_default_gpu": 7,
+      "per_rank_batch_size": 1,
+      "launch_world_size": 4,
+      "launch_mode": "packed_batch_equivalent",
+      "launch_wave": 1
+    }
+  }
+}

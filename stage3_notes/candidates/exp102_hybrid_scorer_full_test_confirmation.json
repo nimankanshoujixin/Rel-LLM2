@@ -1,0 +1,71 @@
+{
+  "bundle_id": "BUNDLE-102",
+  "slug": "hybrid_scorer_full_test_confirmation",
+  "title": "Hybrid scorer full-test confirmation",
+  "family": "control_protocol",
+  "source_type": "ablation",
+  "status": "stopped",
+  "task_run_ids": {
+    "user-churn": "EXP102",
+    "user-ltv": "EXP103",
+    "item-incoterms": "EXP104"
+  },
+  "literature": {
+    "queries": [
+      "stage3 full-test confirmation subset promotable candidate global replay confirm hybrid scorer",
+      "machine learning full test confirmation after subset screening promotable replay control"
+    ],
+    "papers": [
+      {
+        "title": "N/A",
+        "url": "",
+        "claim": "This is a repository-result confirmation bundle rather than a new modeling idea.",
+        "relevance": "Used to verify that the subset-promotable hybrid scorer survives full-test confirmation before any repo-facing claim.",
+        "status": "selected"
+      }
+    ]
+  },
+  "evidence": {
+    "prior_experiments": [
+      "EXP096",
+      "EXP099"
+    ],
+    "why_now": "EXP099 replayed the hybrid scorer and moved all three representative tasks above their stored strict screening baselines. Stage 3 workflow now requires full-test confirmation before any repo-facing claim or later commit/push decision."
+  },
+  "hypothesis": "If the hybrid scorer is a real cross-task gain rather than a subset-only effect, the replay-confirmed bundle should remain non-regressive across user-churn, user-ltv, and item-incoterms when final test evaluation is expanded from the subset to the full split.",
+  "common_overrides": {
+    "autocomplete_decision_interface": "candidate_pairwise_ar_hybrid",
+    "test_steps": -1
+  },
+  "task_overrides": {
+    "user-churn": {},
+    "user-ltv": {},
+    "item-incoterms": {}
+  },
+  "notes": [
+    "Repository-result confirmation only. No new modeling, loss, sampling, or packaging change is allowed.",
+    "Keep the replay-confirmed hybrid scorer fixed and change only the final test evaluation scope via test_steps=-1.",
+    "Stopped by user decision on 2026-05-08 after full-test wall-clock imbalance became too large for the single-GPU item-incoterms leg.",
+    "Use this bundle only as a fixed-hyperparameter full-test control point, not as the new mainline retune path."
+  ],
+  "task_launches": {
+    "user-churn": {
+      "target": "lab25211",
+      "gpu": 0,
+      "window_name": "stage3-exp102",
+      "baseline_default_gpu": 5
+    },
+    "user-ltv": {
+      "target": "lab25211",
+      "gpu": 5,
+      "window_name": "stage3-exp103",
+      "baseline_default_gpu": 6
+    },
+    "item-incoterms": {
+      "target": "lab25211",
+      "gpu": 6,
+      "window_name": "stage3-exp104",
+      "baseline_default_gpu": 7
+    }
+  }
+}

@@ -1,0 +1,190 @@
+{
+  "bundle_id": "BUNDLE-192",
+  "slug": "gnn_repr_alignment_invariants",
+  "title": "GNN representation artifact plus alignment invariants",
+  "family": "representation_alignment",
+  "source_type": "paper+ablation",
+  "launch_mode": "packed_batch_equivalent",
+  "status": "retune_plausible",
+  "gpu_exclude": [
+    0
+  ],
+  "task_cost_weights": {
+    "user-churn": 1.0,
+    "user-ltv": 1.2,
+    "item-incoterms": 2.5
+  },
+  "task_run_ids": {
+    "user-churn": "EXP192",
+    "user-ltv": "EXP193",
+    "item-incoterms": "EXP194"
+  },
+  "literature": {
+    "queries": [
+      "graph masked autoencoder heterogeneous graph self supervised representation learning",
+      "graph contrastive learning preserve node identity transformed views",
+      "knowledge graph representation alignment invariant preservation sparse assignment"
+    ],
+    "papers": [
+      {
+        "title": "GraphMAE: Self-Supervised Masked Graph Autoencoders",
+        "url": "https://arxiv.org/abs/2205.10803",
+        "claim": "Masked feature reconstruction can learn transferable graph representations without downstream labels.",
+        "relevance": "The new GNN artifact should be a label-free graph-side module trained independently of Stage 3 task labels and reused during finetune.",
+        "status": "selected"
+      },
+      {
+        "title": "Heterogeneous Graph Masked Autoencoders",
+        "url": "https://arxiv.org/abs/2208.14957",
+        "claim": "Heterogeneous graph pretraining benefits from attribute masking together with structure-aware objectives.",
+        "relevance": "The rel-amazon artifact uses heterogenous tables and directed FK relations, so masked node reconstruction plus edge prediction is the right medium-scale independent GNN objective family.",
+        "status": "selected"
+      },
+      {
+        "title": "GraphCL: Contrastive Self-Supervised Learning of Graph Representations",
+        "url": "https://arxiv.org/abs/2010.13902",
+        "claim": "Contrastive agreement across transformed views preserves graph-instance identity and improves downstream transfer.",
+        "relevance": "The post-alignment entity-identity loss is the direct mechanism for preserving seed-entity identity when graph states are mapped into the LLM-aligned basis space.",
+        "status": "selected"
+      }
+    ]
+  },
+  "evidence": {
+    "prior_experiments": [
+      "EXP060",
+      "EXP063",
+      "EXP066",
+      "EXP069",
+      "EXP108",
+      "EXP180",
+      "EXP183",
+      "EXP186",
+      "EXP189",
+      "EXP190",
+      "EXP191"
+    ],
+    "why_now": "Tier-3 review after EXP189/190/191 concluded that the cheap scorer and routing branch is saturated and that the missing signal must move upstream into representation quality plus alignment preservation. EXP108 showed item-incoterms is sensitive to preserving a stronger relational score surface, while EXP180 remained only retune-plausible and later routing follow-ups collapsed. The next justified move is therefore a larger but still coherent Stage3-compatible block: independent GNN representation training plus explicit alignment invariants during graph-to-token transfer."
+  },
+  "hypothesis": "If Stage 3 is currently losing salt-side ranking signal because graph structure is weakly represented before alignment and then over-mixed during basis transfer, then loading a label-free independently trained GNN representation artifact and explicitly preserving post-alignment invariants should improve cross-task stability without using the old --pretrain path. The key prediction is not immediate superiority on every task, but that item-incoterms can avoid the known collapse bands while throughput remains operationally acceptable under finetune-only training.",
+  "common_overrides": {
+    "basis_lambda_postalign_tok": 0.1,
+    "basis_lambda_entity_identity": 0.05,
+    "basis_entity_identity_temperature": 0.1,
+    "basis_lambda_branch_orth": 0.02,
+    "basis_assignment_topk": 4
+  },
+  "task_overrides": {
+    "user-churn": {
+      "gnn_repr_artifact": "artifacts/gnn_repr/rel-amazon/gnn_repr.pt",
+      "num_layers": 2,
+      "aggr": "mean"
+    },
+    "user-ltv": {
+      "gnn_repr_artifact": "artifacts/gnn_repr/rel-amazon/gnn_repr.pt",
+      "num_layers": 2,
+      "aggr": "mean"
+    },
+    "item-incoterms": {
+      "gnn_repr_artifact": "artifacts/gnn_repr/rel-salt/gnn_repr.pt"
+    }
+  },
+  "notes": [
+    "Draft created after the Stage 3 architecture review moved the search away from small scorer/routing/distillation variants and toward larger pipeline blocks.",
+    "Keep Stage 3 representative experiments finetune-only; do not use --pretrain.",
+    "This candidate is the first integrated screen of Part 1 plus Part 3: load an independently trained GNN representation artifact and preserve relational invariants during alignment.",
+    "Artifact paths are dataset-bound: rel-amazon tasks must use artifacts/gnn_repr/rel-amazon/gnn_repr.pt and item-incoterms must use artifacts/gnn_repr/rel-salt/gnn_repr.pt.",
+    "Large-table graph cache may use multi-GPU row-sharded embedding, but aggregation, concat, and torch-frame materialization must stay CPU-backed to avoid repeat OOMs on review-scale tables.",
+    "Current rel-amazon artifact metadata is fixed at channels=256, num_layers=2, aggr=mean, so artifact-backed representative runs must align their GNN backbone shape to those values rather than the older per-task baseline defaults.",
+    "Do not relaunch retired manual scans or small scorer/routing neighbors around EXP189/190/191.",
+    "Implementation plan: keep the current basis-alignment path, load the independent GNN artifact through gnn_repr_artifact, add post-alignment basis-target retention, entity-identity contrastive pressure, branch orthogonality regularization, and sparse top-k basis assignment.",
+    "Stage4 compatibility story: the GNN artifact is label-free and reusable across databases, while the alignment invariants regularize transfer without introducing a target-only multiclass head.",
+    "Pre-launch gate requirement: run py_compile, git diff --check, candidate JSON/render validation, and a remote 64-step item-incoterms shape/throughput sanity check before launching the representative bundle.",
+    "Throughput should be judged primarily by per-GPU items/sec, i.e. visible train step/sec times per-rank batch size; aggregate items/sec and wall-clock are secondary operational context.",
+    "Expected failure signature: if item-incoterms still collapses into the known weak band or if per-GPU items/sec falls into an obvious long-tail regression, record the mechanism as blocked and retarget to the concrete bottleneck instead of launching the full bundle.",
+    "Phase 1 fixed-screen outcome was intentionally retained as retune_plausible rather than dropped, because user-churn screening already beat the fixed baseline, user-ltv subset MAE is only a continuation gate, and item-incoterms subset scores are known to be too optimistic relative to full test.",
+    "Phase 2 separate final-test-only confirmation completed on 2026-05-15 without rebundling Optuna and full test.",
+    "Phase 2 outcome is mixed but scientifically meaningful: EXP193 user-ltv beat the stored full-test reference with mae=15.633182804023788 and rmse=50.20323115209195; EXP194 item-incoterms beat the stored full-test reference with mrr=0.7254209687717201 and accuracy=0.6087479985602046; EXP192 user-churn remained below the stored full-test reference with roc_auc=0.6681287838379838 and average_precision=0.7236622468421053.",
+    "This mechanism family is therefore no longer only a placeholder retune_plausible direction with no final evidence: it now has two real full-test wins, including the key item-incoterms task, but it is not yet a clean representative-set sweep because user-churn missed its full-test reference by roc_auc delta -0.02367780299863631.",
+    "Program consequence after Phase 2: treat Part 1 as implemented and validation-backed enough to persist as the clean-worktree base for further work; do not rerun the same final-test-only wave again immediately; use this state to choose the next justified Part 3 follow-up or candidate-selection step."
+  ],
+  "final_results": {
+    "finalized_on": "2026-05-15",
+    "phase1_screening_verdict": "retune_plausible",
+    "phase2_bundle_verdict": "mixed_confirmation",
+    "part1_state": "implemented_validation_backed",
+    "tasks": {
+      "user-churn": {
+        "run_id": "EXP192",
+        "study_name": "exp192_user_churn_optuna_20260513t2307",
+        "screening_primary_metric": "roc_auc",
+        "screening_metric": 0.6755841080409374,
+        "full_test_primary_metric": "roc_auc",
+        "full_test_metric": 0.6681287838379838,
+        "full_test_reference": 0.6918065868366201,
+        "full_test_signed_gain": -0.02367780299863631,
+        "phase2_verdict": "below_reference"
+      },
+      "user-ltv": {
+        "run_id": "EXP193",
+        "study_name": "exp193_user_ltv_optuna_20260514t141722",
+        "screening_primary_metric": "mae",
+        "screening_metric": 75.17855171802512,
+        "full_test_primary_metric": "mae",
+        "full_test_metric": 15.633182804023788,
+        "full_test_reference": 16.671180345060154,
+        "full_test_signed_gain": 1.0379975410363667,
+        "phase2_verdict": "better"
+      },
+      "item-incoterms": {
+        "run_id": "EXP194",
+        "study_name": "exp194_item_incoterms_optuna_20260513t2307",
+        "screening_primary_metric": "mrr",
+        "screening_metric": 0.6760867685916514,
+        "full_test_primary_metric": "mrr",
+        "full_test_metric": 0.7254209687717201,
+        "full_test_reference": 0.7043105782857789,
+        "full_test_signed_gain": 0.02111039048594121,
+        "phase2_verdict": "better"
+      }
+    },
+    "consequence": "Persist the EXP192 family as a mixed but scientifically meaningful Phase 2 result. Keep candidate status retune_plausible for program continuity, treat Part 1 as the validated base state, and move the next action to Part 3 follow-up selection or implementation rather than rerunning the same Optuna or final-test-only wave."
+  },
+  "task_launches": {
+    "user-churn": {
+      "target": "lab25211",
+      "gpu": [
+        1,
+        3
+      ],
+      "window_name": "stage3-exp192",
+      "baseline_default_gpu": 5,
+      "per_rank_batch_size": 2,
+      "launch_world_size": 2,
+      "launch_mode": "packed_batch_equivalent",
+      "launch_wave": 0
+    },
+    "user-ltv": {
+      "target": "lab25211",
+      "gpu": 1,
+      "window_name": "stage3-exp193",
+      "baseline_default_gpu": 6,
+      "per_rank_batch_size": 2,
+      "launch_world_size": 1,
+      "launch_mode": "packed_batch_equivalent",
+      "launch_wave": 1
+    },
+    "item-incoterms": {
+      "target": "lab25211",
+      "gpu": [
+        3,
+        7
+      ],
+      "window_name": "stage3-exp194",
+      "baseline_default_gpu": 7,
+      "per_rank_batch_size": 2,
+      "launch_world_size": 2,
+      "launch_mode": "packed_batch_equivalent",
+      "launch_wave": 1
+    }
+  }
+}

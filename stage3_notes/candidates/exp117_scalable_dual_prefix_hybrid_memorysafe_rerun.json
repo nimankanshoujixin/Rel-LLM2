@@ -1,0 +1,69 @@
+{
+  "bundle_id": "BUNDLE-117",
+  "slug": "scalable_dual_prefix_hybrid_memorysafe_rerun",
+  "title": "Scalable dual-prefix hybrid memory-safe rerun",
+  "family": "label_interface",
+  "source_type": "ablation",
+  "status": "resource_blocked",
+  "task_run_ids": {
+    "user-churn": "EXP117",
+    "user-ltv": "EXP118",
+    "item-incoterms": "EXP119"
+  },
+  "literature": {
+    "queries": [
+      "candidate aware multiclass dual prefix memory safe rerun shared prefix raw label class id",
+      "autocomplete multiclass per sample shared prefix scoring memory safe dual view rerun"
+    ],
+    "papers": []
+  },
+  "evidence": {
+    "prior_experiments": [
+      "EXP084",
+      "EXP093",
+      "EXP099",
+      "EXP111",
+      "EXP114"
+    ],
+    "why_now": "EXP111 was implementation-blocked by missing scorer initialization. EXP114 fixed that bug and showed the intended dual-prefix family is still resource-blocked on item-incoterms because the batched raw-label shared-prefix recursion exhausts GPU memory before the first evaluation. The next justified step is a memory-safe rerun of the same architecture family with per-sample prefix scoring rather than another scientific branch switch."
+  },
+  "hypothesis": "A memory-safe rerun that computes the dual-prefix shared-prefix scorer per sample should preserve the intended architecture while reducing peak KV-cache memory enough for item-incoterms to complete. This keeps the same candidate-aware dual-prefix family and tests it cleanly instead of confounding the result with a different architecture.",
+  "common_overrides": {
+    "autocomplete_decision_interface": "candidate_pairwise_dual_shared_prefix_hybrid"
+  },
+  "task_overrides": {
+    "user-churn": {},
+    "user-ltv": {},
+    "item-incoterms": {}
+  },
+  "notes": [
+    "This is a clean rerun of the same dual-prefix architecture after converting the shared-prefix scorer to a memory-safe per-sample execution path.",
+    "Do not mix any new loss, sampling, packaging, or pretrain changes into this rerun.",
+    "Launched on 2026-05-08 through the local Stage 3 launcher.",
+    "Resolved idle-GPU placement at launch time: user-churn -> lab25211 GPU 0, user-ltv -> lab25211 GPU 5, item-incoterms -> lab25211 GPU 6.",
+    "Follow-up orchestrator status check after launch showed all three windows up and logs in DB-load startup.",
+    "Completed on 2026-05-08 as a resource-blocked bundle.",
+    "user-churn and user-ltv finished, but item-incoterms still ran out of memory before the first evaluation even after moving the shared-prefix scorer to a per-sample path.",
+    "Treat this as evidence that the dual-prefix family now needs an explicit multi-GPU fallback rather than another single-GPU rerun."
+  ],
+  "task_launches": {
+    "user-churn": {
+      "target": "lab25211",
+      "gpu": 0,
+      "window_name": "stage3-exp117",
+      "baseline_default_gpu": 5
+    },
+    "user-ltv": {
+      "target": "lab25211",
+      "gpu": 5,
+      "window_name": "stage3-exp118",
+      "baseline_default_gpu": 6
+    },
+    "item-incoterms": {
+      "target": "lab25211",
+      "gpu": 6,
+      "window_name": "stage3-exp119",
+      "baseline_default_gpu": 7
+    }
+  }
+}

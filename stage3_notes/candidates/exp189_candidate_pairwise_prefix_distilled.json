@@ -1,0 +1,156 @@
+{
+  "bundle_id": "BUNDLE-189",
+  "slug": "candidate_pairwise_prefix_distilled",
+  "title": "Prefix-distilled candidate pairwise scorer",
+  "family": "candidate_token_distillation",
+  "source_type": "paper+ablation",
+  "launch_mode": "packed_batch_equivalent",
+  "status": "failed",
+  "gpu_exclude": [
+    0
+  ],
+  "task_cost_weights": {
+    "user-churn": 1.0,
+    "user-ltv": 1.2,
+    "item-incoterms": 2.0
+  },
+  "task_run_ids": {
+    "user-churn": "EXP189",
+    "user-ltv": "EXP190",
+    "item-incoterms": "EXP191"
+  },
+  "literature": {
+    "queries": [
+      "knowledge distillation teacher student neural network",
+      "candidate ranking distillation listwise soft labels",
+      "shared prefix candidate token scoring distillation"
+    ],
+    "papers": [
+      {
+        "title": "Distilling the Knowledge in a Neural Network",
+        "url": "https://arxiv.org/abs/1503.02531",
+        "claim": "A compact student can learn a richer teacher's output distribution through soft-target distillation rather than hard labels alone.",
+        "relevance": "Stage 3 cheap sample-candidate scorers repeatedly fail to reproduce the candidate-token score surface. Distillation gives the cheap scorer the EXP108-style candidate-token distribution as a training signal without making it the final inference path.",
+        "status": "selected"
+      },
+      {
+        "title": "Learning to Rank: From Pairwise Approach to Listwise Approach",
+        "url": "https://www.microsoft.com/en-us/research/publication/learning-to-rank-from-pairwise-approach-to-listwise-approach/",
+        "claim": "Ranking can be trained from listwise score distributions rather than only pointwise hard labels.",
+        "relevance": "The blocker metric is MRR. A teacher distribution over candidates is closer to candidate ranking than another scalar auxiliary or hard-negative weight scan.",
+        "status": "selected"
+      }
+    ]
+  },
+  "evidence": {
+    "prior_experiments": [
+      "EXP099",
+      "EXP108",
+      "EXP156",
+      "EXP180",
+      "EXP183",
+      "EXP186"
+    ],
+    "why_now": "EXP099 showed candidate-token scoring can make the subset bundle promotable, but the exhaustive hybrid path is not a final Stage4-compatible endpoint. EXP108 preserved item-incoterms near the strict baseline with class-id shared-prefix candidate-token scoring. Later cheap scorer and routing variants repeatedly collapsed around mrr=0.678, showing that hard-label training of the cheap scorer is not recovering the teacher score surface. The next medium-scale action is to distill the EXP108-style prefix teacher into the cheap pairwise scorer during finetune while keeping inference non-autoregressive."
+  },
+  "hypothesis": "For autocomplete multiclass tasks, the cheap candidate pairwise scorer lacks the candidate-token distributional signal that preserved item-incoterms in EXP108. Training it with a detached class-id shared-prefix teacher distribution should transfer that salt-side score surface into an O(L+C)-style sample-candidate scorer, while avoiding shared-prefix inference, prompt routing variants, residual-scale scans, and old exhaustive O(L*C) rollout.",
+  "common_overrides": {
+    "autocomplete_decision_interface": "candidate_pairwise_prefix_distilled",
+    "autocomplete_prefix_distill_weight": 1.0,
+    "autocomplete_prefix_distill_temperature": 1.0
+  },
+  "task_overrides": {
+    "user-churn": {},
+    "user-ltv": {},
+    "item-incoterms": {}
+  },
+  "notes": [
+    "Draft created after EXP186/187/188 finalized failed and triggered Tier-3 review.",
+    "Keep Stage 3 finetune-only; do not use --pretrain.",
+    "This is not a shared-prefix rerun as the final scorer: shared-prefix is a detached training teacher only, and eval/test prediction uses the cheap pairwise sample-candidate scorer.",
+    "Do not scan distillation weight or temperature manually. Fixed values are used for the initial architecture screen; any value search belongs to later Optuna only if the mechanism earns budget.",
+    "Implementation plan: add candidate_pairwise_prefix_distilled, compute student pairwise logits from the prompt representation, compute detached class-id shared-prefix teacher logits during training, add KL soft-target distillation in main.py, and leave eval/test on student logits only.",
+    "Stage4 compatibility story: source databases can synthesize categorical-value ranking or value-selection proxy episodes and distill candidate-token/text teacher distributions into the same reusable candidate scorer without true source multiclass benchmark tasks.",
+    "Expected failure signature: if item-incoterms remains in the 0.678 collapse band, the cheap pairwise scorer cannot absorb the candidate-token teacher under fixed screening; if throughput is far below EXP108/180 effective items/sec, the teacher path is operationally too expensive.",
+    "Implementation added on 2026-05-11 via candidate_pairwise_prefix_distilled and autocomplete_prefix_distill_weight: training computes a detached class-id shared-prefix teacher distribution and adds KL distillation, while eval/test return only pairwise student logits.",
+    "Pre-launch validation completed on 2026-05-11: py_compile, git diff --check, JSON validation, and remote item-incoterms shape/throughput sanity all passed.",
+    "Remote sanity check completed on 2026-05-11: a 64-step item-incoterms finetune-only run on lab25211 GPU6 completed cleanly with no --pretrain, reached roughly 2.45 train step/s with batch_size=4 (about 9.8 effective train items/sec), and eval/test ran around 14.5 it/s with val_size=1. This is slower than prompt-routing candidates but healthier than the old EXP110 shared-prefix long tail on item-incoterms, which was about 1.28 train step/s and 3.23 test it/s.",
+    "Launched on 2026-05-11 with packed batch-equivalent placement: EXP190 user-ltv on GPUs 4,6 with per-rank batch 1 wave 0; EXP189 user-churn on GPU4 with per-rank batch 4 wave 1; EXP191 item-incoterms on GPUs 6,7 with per-rank batch 2 wave 1.",
+    "First post-launch status: EXP190 is running, EXP189/191 are queued for wave 1, and orchestrator recommends keep_watching.",
+    "Finalized on 2026-05-12 via stage3_orchestrator.py status --sync-logs --recommend-kill. Global verdict: failed. EXP189 user-churn roc_auc=0.6306934031178256, worse than baseline 0.6540209032382359 by -0.023327500120410294 against replay-aware effective delta 0.002552699600237518. EXP190 user-ltv mae=77.16605039620961, neutral because the improvement 2.106522302821247 is inside replay-aware effective delta 6.511244718243262. EXP191 item-incoterms mrr=0.6793995690724206, worse than baseline 0.8147880873466811 by -0.13538851827426046 against replay-aware effective delta 0.013037038915945098.",
+    "Throughput was operationally acceptable but not scientifically sufficient: item-incoterms final test ran around 14.6 it/s, and the pre-launch sanity established roughly 9.8 effective train items/sec. The failure is therefore not a practical-throughput failure; the pairwise student did not absorb the prefix teacher's salt-side ranking signal under the fixed screen.",
+    "Search-space consequence: stop the small candidate-aware scorer / routing / distillation branch as an active Stage 3 line. EXP180 remains retune-plausible only as a fixed-screen signal, not promotable. Do not manually scan distillation weight, temperature, token budgets, batching, routing, shared-prefix, residual scale, or pairwise scorer variants. Next work should move to larger pipeline blocks: independent GNN representation training and explicit relational invariant preservation during cross-space alignment."
+  ],
+  "final_results": {
+    "finalized_on": "2026-05-12",
+    "global_verdict": "failed",
+    "tasks": {
+      "user-churn": {
+        "run_id": "EXP189",
+        "primary_metric": "roc_auc",
+        "current": 0.6306934031178256,
+        "baseline": 0.6540209032382359,
+        "signed_gain": -0.023327500120410294,
+        "effective_delta_threshold": 0.002552699600237518,
+        "verdict": "worse"
+      },
+      "user-ltv": {
+        "run_id": "EXP190",
+        "primary_metric": "mae",
+        "current": 77.16605039620961,
+        "baseline": 79.27257269903086,
+        "signed_gain": 2.106522302821247,
+        "effective_delta_threshold": 6.511244718243262,
+        "verdict": "neutral"
+      },
+      "item-incoterms": {
+        "run_id": "EXP191",
+        "primary_metric": "mrr",
+        "current": 0.6793995690724206,
+        "baseline": 0.8147880873466811,
+        "signed_gain": -0.13538851827426046,
+        "effective_delta_threshold": 0.013037038915945098,
+        "verdict": "worse"
+      }
+    },
+    "consequence": "Operational throughput was acceptable, but the mechanism failed scientifically. Retire the small candidate-aware scorer/routing/distillation branch as an active Stage 3 line and move to larger pipeline blocks: independent GNN representation training plus explicit relational invariant preservation during cross-space alignment."
+  },
+  "task_launches": {
+    "user-ltv": {
+      "target": "lab25211",
+      "gpu": [
+        4,
+        6
+      ],
+      "window_name": "stage3-exp190",
+      "baseline_default_gpu": 6,
+      "per_rank_batch_size": 1,
+      "launch_world_size": 2,
+      "launch_mode": "packed_batch_equivalent",
+      "launch_wave": 0
+    },
+    "user-churn": {
+      "target": "lab25211",
+      "gpu": 4,
+      "window_name": "stage3-exp189",
+      "baseline_default_gpu": 5,
+      "per_rank_batch_size": 4,
+      "launch_world_size": 1,
+      "launch_mode": "packed_batch_equivalent",
+      "launch_wave": 1
+    },
+    "item-incoterms": {
+      "target": "lab25211",
+      "gpu": [
+        6,
+        7
+      ],
+      "window_name": "stage3-exp191",
+      "baseline_default_gpu": 7,
+      "per_rank_batch_size": 2,
+      "launch_world_size": 2,
+      "launch_mode": "packed_batch_equivalent",
+      "launch_wave": 1
+    }
+  }
+}

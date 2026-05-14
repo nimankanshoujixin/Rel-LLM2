@@ -1,0 +1,59 @@
+{
+  "candidate": "stage3_notes\\candidates\\exp081_autocomplete_label_interface_unification.json",
+  "tasks": {
+    "user-churn": {
+      "run_id": "EXP081",
+      "log_path": "G:\\RelLLM-2\\Rel-LLM\\stage3_notes\\reports\\log_cache\\stage3-exp081.log",
+      "metrics": {
+        "average_precision": 0.689861793482772,
+        "accuracy": 0.6484375,
+        "f1": 0.7744360902255639,
+        "roc_auc": 0.6549520766773161
+      },
+      "comparison": {
+        "primary_metric": "roc_auc",
+        "current": 0.6549520766773161,
+        "baseline": 0.6540209032382359,
+        "signed_gain": 0.000931173439080224,
+        "delta_threshold": 0.001,
+        "verdict": "neutral"
+      }
+    },
+    "user-ltv": {
+      "run_id": "EXP082",
+      "log_path": "G:\\RelLLM-2\\Rel-LLM\\stage3_notes\\reports\\log_cache\\stage3-exp082.log",
+      "metrics": {
+        "r2": -0.20358555405560197,
+        "mae": 81.47815621679416,
+        "rmse": 138.977152325377
+      },
+      "comparison": {
+        "primary_metric": "mae",
+        "current": 81.47815621679416,
+        "baseline": 79.27257269903086,
+        "signed_gain": -2.2055835177633014,
+        "delta_threshold": 0.001,
+        "verdict": "worse"
+      }
+    },
+    "item-incoterms": {
+      "run_id": "EXP083",
+      "log_path": "G:\\RelLLM-2\\Rel-LLM\\stage3_notes\\reports\\log_cache\\stage3-exp083.log",
+      "metrics": {
+        "accuracy": 0.734375,
+        "macro_f1": 0.15535397516529592,
+        "micro_f1": 0.734375,
+        "mrr": 0.811239769345238
+      },
+      "comparison": {
+        "primary_metric": "mrr",
+        "current": 0.811239769345238,
+        "baseline": 0.8147880873466811,
+        "signed_gain": -0.0035483180014430626,
+        "delta_threshold": 0.001,
+        "verdict": "worse"
+      }
+    }
+  },
+  "global_verdict": "failed"
+}

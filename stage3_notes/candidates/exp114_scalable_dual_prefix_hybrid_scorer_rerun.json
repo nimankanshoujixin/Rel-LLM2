@@ -1,0 +1,69 @@
+{
+  "bundle_id": "BUNDLE-114",
+  "slug": "scalable_dual_prefix_hybrid_scorer_rerun",
+  "title": "Scalable dual-prefix hybrid scorer rerun",
+  "family": "label_interface",
+  "source_type": "ablation",
+  "status": "resource_blocked",
+  "task_run_ids": {
+    "user-churn": "EXP114",
+    "user-ltv": "EXP115",
+    "item-incoterms": "EXP116"
+  },
+  "literature": {
+    "queries": [
+      "candidate aware multiclass dual view semantic raw label class id shared prefix scorer scalable rerun",
+      "autocomplete multiclass dual prefix shared prefix hybrid rerun implementation fix"
+    ],
+    "papers": []
+  },
+  "evidence": {
+    "prior_experiments": [
+      "EXP084",
+      "EXP093",
+      "EXP099",
+      "EXP108",
+      "EXP111"
+    ],
+    "why_now": "EXP111 was implementation-blocked rather than scientifically failed: user-churn and user-ltv completed, while item-incoterms crashed before its first evaluation because the dual-prefix path instantiated the fusion gate but not the pairwise scorer. The code path is now fixed, so the next correct action is a clean rerun of the same candidate family."
+  },
+  "hypothesis": "With the dual-prefix initialization bug fixed, a clean rerun of the scalable dual-prefix hybrid scorer should test the intended architecture: pairwise candidate-aware interaction plus shared-prefix scoring over both class-id and raw-label token views, without returning to exhaustive O(L*C) rollout.",
+  "common_overrides": {
+    "autocomplete_decision_interface": "candidate_pairwise_dual_shared_prefix_hybrid"
+  },
+  "task_overrides": {
+    "user-churn": {},
+    "user-ltv": {},
+    "item-incoterms": {}
+  },
+  "notes": [
+    "This is a clean rerun of EXP111 after fixing the missing pairwise-scorer initialization bug on the dual-prefix path.",
+    "Do not mix any new loss, sampling, packaging, or pretrain changes into this rerun.",
+    "Launched on 2026-05-08 through the local Stage 3 launcher.",
+    "Resolved idle-GPU placement at launch time: user-churn -> lab25211 GPU 0, user-ltv -> lab25211 GPU 5, item-incoterms -> lab25211 GPU 6.",
+    "Follow-up orchestrator status check after launch showed all three windows up and logs in DB-load startup.",
+    "Completed on 2026-05-08 as a resource-blocked bundle.",
+    "user-churn and user-ltv finished, but item-incoterms ran out of memory before the first evaluation on the raw-label shared-prefix path.",
+    "Treat this as a memory-scaling failure in the current implementation rather than scientific evidence against the dual-prefix family."
+  ],
+  "task_launches": {
+    "user-churn": {
+      "target": "lab25211",
+      "gpu": 0,
+      "window_name": "stage3-exp114",
+      "baseline_default_gpu": 5
+    },
+    "user-ltv": {
+      "target": "lab25211",
+      "gpu": 5,
+      "window_name": "stage3-exp115",
+      "baseline_default_gpu": 6
+    },
+    "item-incoterms": {
+      "target": "lab25211",
+      "gpu": 6,
+      "window_name": "stage3-exp116",
+      "baseline_default_gpu": 7
+    }
+  }
+}

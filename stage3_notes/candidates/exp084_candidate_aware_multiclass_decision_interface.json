@@ -1,0 +1,89 @@
+{
+  "bundle_id": "BUNDLE-084",
+  "slug": "candidate_aware_multiclass_decision_interface",
+  "title": "Candidate-aware multiclass decision interface",
+  "family": "label_interface",
+  "source_type": "paper+ablation",
+  "status": "stopped",
+  "task_run_ids": {
+    "user-churn": "EXP084",
+    "user-ltv": "EXP085",
+    "item-incoterms": "EXP086"
+  },
+  "literature": {
+    "queries": [
+      "graph llm candidate aware multiclass ranking decision interface autocomplete mrr",
+      "graph rag candidate scoring structured classification interface multiclass ranking"
+    ],
+    "papers": [
+      {
+        "title": "Graph Retrieval-Augmented Generation: A Survey",
+        "url": "https://arxiv.org/abs/2408.08921",
+        "claim": "Graph-enhanced generation quality depends on aligning retrieval, evidence organization, and downstream decision interfaces.",
+        "relevance": "Supports redesigning the multiclass decision interface rather than treating label tokens as a shallow afterthought.",
+        "status": "selected"
+      },
+      {
+        "title": "G-Retriever: Retrieval-Augmented Generation for Graph Question Answering",
+        "url": "https://arxiv.org/abs/2402.07630",
+        "claim": "Graph evidence must be consumed through an interface matched to the downstream decision problem, not merely compressed into a generic prompt.",
+        "relevance": "Supports a candidate-aware scoring interface for autocomplete-style ranking tasks.",
+        "status": "selected"
+      },
+      {
+        "title": "Can we Soft Prompt LLMs for Graph Learning Tasks?",
+        "url": "https://arxiv.org/abs/2402.10359",
+        "claim": "Prompt-side graph/task interface design can dominate gains once encoder-side modifications saturate.",
+        "relevance": "Supports moving from a verbalizer tweak to a more structural multiclass decision interface.",
+        "status": "selected"
+      }
+    ]
+  },
+  "evidence": {
+    "prior_experiments": [
+      "EXP078",
+      "EXP081",
+      "EXP087",
+      "EXP090"
+    ],
+    "why_now": "EXP081 showed that autocomplete label-interface unification nudges item-incoterms in the right direction but is still too weak. EXP087 then showed that baseline rerun variance is large enough to confound near-boundary interpretation, and EXP090 finally showed that the EXP078 split local/global packaging family does not survive replay. With loss, sampling, basis gating, and packaging-nearby branches either saturated or replay-failed, the next justified step is a broader candidate-aware multiclass decision interface."
+  },
+  "hypothesis": "The salt-side bottleneck is not only in graph evidence quality but in how multiclass candidates are represented and scored. A broader candidate-aware multiclass interface should keep both the class-id view and the semantic raw-label view of each candidate, then let the prompt-conditioned sample representation fuse those two candidate views at scoring time. This should preserve ranking discrimination better than raw-label verbalizers alone or class-id-only scorer unification alone.",
+  "common_overrides": {
+    "autocomplete_decision_interface": "candidate_dual_view_fusion"
+  },
+  "task_overrides": {
+    "user-churn": {},
+    "user-ltv": {},
+    "item-incoterms": {}
+  },
+  "notes": [
+    "Implemented and launched on 2026-05-07 through the local Stage 3 launcher.",
+    "Completed on 2026-05-07 with global verdict: failed.",
+    "Proposed minimum mechanism: for autocomplete multiclass tasks only, build per-candidate representations from both class-id text and raw-label text, then score candidates with a prompt-conditioned fusion of the two views.",
+    "No new loss family, no sampling tweak, and no packaging-nearby rerun should be mixed into this first implementation.",
+    "First stable orchestrator status check shows all three windows up; user-churn and user-ltv completed DB load, while item-incoterms remained in early salt startup.",
+    "Outcome: user-churn improved strongly, but user-ltv regressed and item-incoterms stayed in the same regressive MRR band as recent packaging/control runs.",
+    "This should be treated as the next architecture-review output, not as an excuse to resume blind lightweight scanning."
+  ],
+  "task_launches": {
+    "user-churn": {
+      "target": "lab25211",
+      "gpu": 0,
+      "window_name": "stage3-exp084",
+      "baseline_default_gpu": 5
+    },
+    "user-ltv": {
+      "target": "lab25211",
+      "gpu": 5,
+      "window_name": "stage3-exp085",
+      "baseline_default_gpu": 6
+    },
+    "item-incoterms": {
+      "target": "lab25211",
+      "gpu": 6,
+      "window_name": "stage3-exp086",
+      "baseline_default_gpu": 7
+    }
+  }
+}

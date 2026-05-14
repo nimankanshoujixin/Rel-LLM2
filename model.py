@@ -57,8 +57,17 @@ class Model(torch.nn.Module):
                  norm: str = "batch_norm", dropout=0.0, shallow_list: List[NodeType] = [],  # List of node types to add shallow embeddings to input
                  id_awareness: bool = False, model_type: str = "meta-llama/Llama-3.2-1B", max_new_tokens=1, llm_frozen=False, output_mlp=False, output_probs=True, num_demo=4,
                  dataset=None, task=None, gamma=2.0, alpha=[1.0, 1.0], mask_ratio=0.5, pretrain_random_table=False, pretrain_mask_cell=True, device: torch.device | None = None,
+                 gnn_repr_artifact: Dict[str, Any] | None = None,
                  basis_artifact: Dict[str, Any] | None = None, basis_tau: float = 0.07, basis_residual_alpha: float = 0.1,
-                 basis_graph_alpha: float = 0.05, basis_lambda_tok: float = 1.0, basis_lambda_g: float = 1.0, basis_lambda_sharp: float = 0.01):
+                 basis_graph_alpha: float = 0.05, basis_lambda_tok: float = 1.0, basis_lambda_g: float = 1.0, basis_lambda_sharp: float = 0.01,
+                 basis_lambda_tok_recon: float = 0.0, basis_lambda_g_recon: float = 0.0,
+                 basis_lambda_fk_dir: float = 0.0, basis_fk_dir_margin: float = 0.2,
+                 basis_lambda_route_consistency: float = 0.0,
+                 basis_lambda_postalign_tok: float = 0.0, basis_lambda_entity_identity: float = 0.0,
+                 basis_entity_identity_temperature: float = 0.1, basis_lambda_branch_orth: float = 0.0,
+                 basis_assignment_topk: int = 0,
+                 basis_gate_strategy: str = "none", basis_gate_token_floor: float = 0.0,
+                 basis_gate_graph_floor: float = 0.0):
         super().__init__()
         self.encoder = HeteroEncoder(channels=channels, node_to_col_names_dict={node_type: data[node_type].tf.col_names_dict for node_type in data.node_types},
                                      node_to_col_stats=col_stats_dict, )
@@ -89,8 +98,34 @@ class Model(torch.nn.Module):
         self.basis_lambda_tok = basis_lambda_tok
         self.basis_lambda_g = basis_lambda_g
         self.basis_lambda_sharp = basis_lambda_sharp
+        self.basis_lambda_tok_recon = basis_lambda_tok_recon
+        self.basis_lambda_g_recon = basis_lambda_g_recon
+        self.basis_lambda_fk_dir = basis_lambda_fk_dir
+        self.basis_fk_dir_margin = basis_fk_dir_margin
+        self.basis_lambda_route_consistency = basis_lambda_route_consistency
+        self.basis_lambda_postalign_tok = basis_lambda_postalign_tok
+        self.basis_lambda_entity_identity = basis_lambda_entity_identity
+        self.basis_entity_identity_temperature = max(1e-6, float(basis_entity_identity_temperature))
+        self.basis_lambda_branch_orth = basis_lambda_branch_orth
+        self.basis_assignment_topk = max(0, int(basis_assignment_topk))
+        self.basis_gate_strategy = basis_gate_strategy
+        self.basis_gate_token_floor = basis_gate_token_floor
+        self.basis_gate_graph_floor = basis_gate_graph_floor
         self.latest_align_loss = 0.0
-        self.latest_align_components = {"token_bce": 0.0, "graph_bce": 0.0, "entropy": 0.0}
+        self.latest_align_components = {
+            "token_bce": 0.0,
+            "graph_bce": 0.0,
+            "entropy": 0.0,
+            "token_recon": 0.0,
+            "graph_recon": 0.0,
+            "fk_direction": 0.0,
+            "route_consistency": 0.0,
+            "postalign_token_bce": 0.0,
+            "entity_identity": 0.0,
+            "branch_orth": 0.0,
+            "token_gate": 0.0,
+            "graph_gate": 0.0,
+        }
 
         # pretrain setup
         self.pretrain_mask_cell = pretrain_mask_cell
@@ -181,6 +216,8 @@ class Model(torch.nn.Module):
                 ]
 
         self.reset_parameters()
+        if gnn_repr_artifact is not None:
+            self._load_gnn_representation_artifact(gnn_repr_artifact)
 
     def reset_parameters(self):
         self.encoder.reset_parameters()
@@ -229,6 +266,14 @@ class Model(torch.nn.Module):
         self.basis_token_query_proj = Linear(out_dim, out_dim, bias=False).to(self.model_device)
         self.basis_graph_query_proj = Linear(out_dim, out_dim, bias=False).to(self.model_device)
         self.basis_enabled = True
+
+    def _load_gnn_representation_artifact(self, artifact: Dict[str, Any]) -> None:
+        encoder_state_dict = artifact.get("encoder_state_dict")
+        gnn_state_dict = artifact.get("gnn_state_dict")
+        if encoder_state_dict is None or gnn_state_dict is None:
+            raise ValueError("GNN representation artifact must contain encoder_state_dict and gnn_state_dict.")
+        self.encoder.load_state_dict(encoder_state_dict, strict=True)
+        self.gnn.load_state_dict(gnn_state_dict, strict=True)
 
     @staticmethod
     def _canonical_pair(table_a: str, table_b: str) -> tuple[str, str]:
@@ -693,7 +738,20 @@ class Model(torch.nn.Module):
     ) -> tuple[list[Tensor], Tensor]:
         if not self.basis_enabled or not graph_prompts:
             zero = self.word_embedding.weight.new_zeros(())
-            self.latest_align_components = {"token_bce": 0.0, "graph_bce": 0.0, "entropy": 0.0}
+            self.latest_align_components = {
+                "token_bce": 0.0,
+                "graph_bce": 0.0,
+                "entropy": 0.0,
+                "token_recon": 0.0,
+                "graph_recon": 0.0,
+                "fk_direction": 0.0,
+                "route_consistency": 0.0,
+                "postalign_token_bce": 0.0,
+                "entity_identity": 0.0,
+                "branch_orth": 0.0,
+                "token_gate": 0.0,
+                "graph_gate": 0.0,
+            }
             return graph_prompts, zero
 
         align_losses = []
@@ -747,13 +805,35 @@ class Model(torch.nn.Module):
             "token_bce": sum(token_bce_vals) / max(len(token_bce_vals), 1),
             "graph_bce": sum(graph_bce_vals) / max(len(graph_bce_vals), 1),
             "entropy": sum(entropy_vals) / max(len(entropy_vals), 1),
+            "token_recon": 0.0,
+            "graph_recon": 0.0,
+            "fk_direction": 0.0,
+            "route_consistency": 0.0,
+            "postalign_token_bce": 0.0,
+            "entity_identity": 0.0,
+            "branch_orth": 0.0,
+            "token_gate": 0.0,
+            "graph_gate": 0.0,
         }
         return aligned_prompts, torch.stack(align_losses).mean()
 
     def forward(self, batch: HeteroData, entity_table: NodeType, context=True, demo_info=None, inference: bool = False, pretrain_mode: bool = False) -> Tensor:
         if self.model is not None:
             self.latest_align_loss = self.word_embedding.weight.new_zeros(())
-            self.latest_align_components = {"token_bce": 0.0, "graph_bce": 0.0, "entropy": 0.0}
+            self.latest_align_components = {
+                "token_bce": 0.0,
+                "graph_bce": 0.0,
+                "entropy": 0.0,
+                "token_recon": 0.0,
+                "graph_recon": 0.0,
+                "fk_direction": 0.0,
+                "route_consistency": 0.0,
+                "postalign_token_bce": 0.0,
+                "entity_identity": 0.0,
+                "branch_orth": 0.0,
+                "token_gate": 0.0,
+                "graph_gate": 0.0,
+            }
         if pretrain_mode:
             return self.pretrain(batch, entity_table)
         x_dict, batch_size = self.encode(batch, entity_table)

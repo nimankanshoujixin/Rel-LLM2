@@ -1,0 +1,94 @@
+{
+  "bundle_id": "BUNDLE-141",
+  "slug": "candidate_pairwise_query_conditioned_interaction",
+  "title": "Candidate pairwise query-conditioned interaction",
+  "family": "label_interface",
+  "source_type": "ablation",
+  "launch_mode": "serial_batch_equivalent",
+  "status": "failed",
+  "task_run_ids": {
+    "user-churn": "EXP141",
+    "user-ltv": "EXP142",
+    "item-incoterms": "EXP143"
+  },
+  "literature": {
+    "queries": [
+      "query conditioned label token pooling candidate scoring scalable multiclass ranking",
+      "sample conditioned verbalizer token attention multiclass candidate scorer"
+    ],
+    "papers": [
+      {
+        "title": "",
+        "url": "",
+        "claim": "",
+        "relevance": "",
+        "status": "not_required_for_ablation"
+      }
+    ]
+  },
+  "evidence": {
+    "prior_experiments": [
+      "EXP099",
+      "EXP129",
+      "EXP138"
+    ],
+    "why_now": "EXP129 showed that pure pairwise interaction restores throughput but loses too much salt-side signal, while EXP138 showed that improving only the static label encoder with position-aware pooling is still too weak. EXP099 remains the strongest evidence that candidate-token information matters. The next justified scalable step is therefore to keep the pairwise scorer but make label-token aggregation explicitly sample-conditioned, so candidate-token evidence is selected relative to the current prompt without reintroducing autoregressive rollout."
+  },
+  "hypothesis": "If the missing scalable signal is not token order alone but prompt-conditioned selection over candidate tokens, then replacing static label pooling with a sample-conditioned token attention pool inside the pairwise scorer should recover part of the salt-side candidate-token benefit while keeping the multiclass path in a non-autoregressive O(L + C*T) regime that remains plausible for Stage 4 pretraining.",
+  "common_overrides": {
+    "autocomplete_decision_interface": "candidate_pairwise_query_conditioned_interaction"
+  },
+  "task_overrides": {
+    "user-churn": {},
+    "user-ltv": {},
+    "item-incoterms": {}
+  },
+  "notes": [
+    "Keep Stage 3 finetune-only; do not introduce pretrain, loss-family changes, sampling changes, or packaging changes.",
+    "This family keeps the fast pairwise scorer but replaces static candidate-view pooling with prompt-conditioned token attention over class-id and raw-label candidate text.",
+    "The intended benefit is to recover some of the useful candidate-token selectivity from the hybrid line without returning to autoregressive candidate rollout.",
+    "Use serial_batch_equivalent scheduling by default.",
+    "Launched on 2026-05-09 through the local Stage 3 launcher.",
+    "Completed on 2026-05-09 with global verdict: failed.",
+    "user-churn improved strongly, user-ltv remained inside the replay-aware neutral band, and item-incoterms stayed far below the strict MRR baseline.",
+    "Conclusion: sample-conditioned single-vector label pooling is still too weak; the active frontier should move to token-level candidate statistics rather than more pooled-label near-neighbors."
+  ],
+  "task_launches": {
+    "user-churn": {
+      "target": "lab25211",
+      "gpu": [
+        5,
+        6
+      ],
+      "window_name": "stage3-exp141",
+      "baseline_default_gpu": 5,
+      "per_rank_batch_size": 2,
+      "launch_world_size": 2,
+      "launch_mode": "serial_batch_equivalent"
+    },
+    "user-ltv": {
+      "target": "lab25211",
+      "gpu": [
+        5,
+        6
+      ],
+      "window_name": "stage3-exp142",
+      "baseline_default_gpu": 6,
+      "per_rank_batch_size": 1,
+      "launch_world_size": 2,
+      "launch_mode": "serial_batch_equivalent"
+    },
+    "item-incoterms": {
+      "target": "lab25211",
+      "gpu": [
+        5,
+        6
+      ],
+      "window_name": "stage3-exp143",
+      "baseline_default_gpu": 7,
+      "per_rank_batch_size": 2,
+      "launch_world_size": 2,
+      "launch_mode": "serial_batch_equivalent"
+    }
+  }
+}

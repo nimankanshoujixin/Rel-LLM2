@@ -1,0 +1,121 @@
+{
+  "bundle_id": "BUNDLE-171",
+  "slug": "batched_shared_prefix_hybrid_scorer",
+  "title": "Batched shared-prefix hybrid scorer",
+  "family": "label_interface",
+  "source_type": "ablation",
+  "launch_mode": "packed_batch_equivalent",
+  "status": "failed",
+  "gpu_exclude": [
+    0
+  ],
+  "task_cost_weights": {
+    "user-churn": 1.0,
+    "user-ltv": 1.2,
+    "item-incoterms": 2.5
+  },
+  "task_run_ids": {
+    "user-churn": "EXP171",
+    "user-ltv": "EXP172",
+    "item-incoterms": "EXP173"
+  },
+  "literature": {
+    "queries": [
+      "shared-prefix autoregressive candidate scoring trie batching",
+      "batched prefix tree decoding language model candidate scoring"
+    ],
+    "papers": [
+      {
+        "title": "N/A",
+        "url": "",
+        "claim": "This is an ablation-backed implementation-path candidate, not a new literature-derived scoring objective.",
+        "relevance": "The mechanism keeps the EXP108 shared-prefix candidate-token score surface but changes the execution path to batch same-depth trie expansions and remove the per-prefix tiny-kernel bottleneck.",
+        "status": "not_required_for_ablation"
+      }
+    ]
+  },
+  "evidence": {
+    "prior_experiments": [
+      "EXP099",
+      "EXP108",
+      "EXP126",
+      "EXP165",
+      "EXP168"
+    ],
+    "why_now": "EXP099 established that explicit candidate-token scoring can make the representative bundle non-regressive, but the exhaustive autoregressive head is not scalable. EXP108 showed that class-id shared-prefix scoring preserved item-incoterms near the strict baseline, and under the current replay-aware deltas its user-ltv drop would sit inside the wide neutral band. EXP126 showed shortlist autoregressive reranking was too costly, EXP165 showed the current shared-prefix implementation can become a practical throughput bottleneck around 1.26 train steps/sec, and EXP168 showed fast hidden-token late interaction is scientifically insufficient. The next justified move is therefore not another scorer weight or ranking-margin scan, but an implementation-path test of the EXP108 information path with batched same-depth prefix expansion."
+  },
+  "hypothesis": "If EXP108's class-id shared-prefix candidate-token score surface is the useful salt-side information path, but the recursive one-prefix-at-a-time implementation is the practical blocker, then batching same-depth trie expansions should preserve the same Stage4-compatible candidate-aware decision interface while restoring acceptable item-incoterms throughput. This candidate should be judged first by a remote throughput sanity check; it must not launch as a full bundle if it repeats the EXP165 shared-prefix long-tail signature.",
+  "common_overrides": {
+    "autocomplete_decision_interface": "candidate_pairwise_batched_shared_prefix_hybrid"
+  },
+  "task_overrides": {
+    "user-churn": {},
+    "user-ltv": {},
+    "item-incoterms": {}
+  },
+  "notes": [
+    "Keep Stage 3 finetune-only; do not use --pretrain.",
+    "This is not a new shared-prefix rerun unless the implementation removes the per-step prefix-scoring bottleneck.",
+    "The scorer keeps the EXP108 class-id shared-prefix hybrid score surface but processes same-depth trie expansions in bounded batches instead of launching one LLM forward per prefix node.",
+    "Do not add a hard-negative auxiliary, residual scale, rank margin, prompt-token budget scan, late-interaction scalar, pooled-label variant, or token-stat variant.",
+    "Exclude GPU0 for this candidate only because recent EXP162 evidence showed a pre-eval SIGTERM when user-churn used GPU0 as local rank 0; global pipeline_config keeps gpu_exclude empty.",
+    "Before launch, run py_compile, git diff --check, JSON validation, and a remote item-incoterms shape/throughput sanity check.",
+    "Throughput gate: do not launch EXP171/172/173 unless the item-incoterms sanity check avoids the EXP165 shared-prefix roughly 1.26 train steps/sec long-tail signature and has a plausible wall-clock tail.",
+    "Static validation on 2026-05-10: python -m py_compile passed for tune_hyperparameters.py, main.py, model.py, stage3_research.py, and stage3_orchestrator.py; git diff --check passed; candidate JSON validated.",
+    "Remote item-incoterms sanity check completed on 2026-05-10: 64-step single-GPU run on lab25211 GPU7 entered training, completed cleanly, and did not use --pretrain.",
+    "Sanity throughput evidence: after warmup the training loop reached roughly 3.4-3.6 train steps/sec on GPU7; validation ran around 9.7 it/s. This clears the practical throughput gate relative to EXP165's roughly 1.26 train steps/sec shared-prefix long-tail signature, although it remains slower than EXP168 late interaction.",
+    "Sanity conclusion: launch is allowed as a normal EXP171/172/173 Stage 3 screening bundle, with throughput still monitored as a first-class signal on every heartbeat/status pass.",
+    "Launched on 2026-05-10 through the local Stage 3 launcher.",
+    "Resolved packed batch-equivalent placement at launch time: user-churn -> lab25211 GPUs 5,6 with per-rank batch 2 in wave 0; user-ltv -> lab25211 GPU 5 with per-rank batch 2 in wave 1; item-incoterms -> lab25211 GPUs 6,7 with per-rank batch 2 in wave 1.",
+    "First post-launch status check showed EXP171 window up in rel-amazon DB-load startup; EXP172 and EXP173 are correctly waiting for wave 1; orchestrator recommendation: keep_watching.",
+    "Heartbeat automation continue-stage-3-finetune-work was retargeted to monitor EXP171/172/173 with the throughput guardrail included in every status pass.",
+    "Completed and finalized on 2026-05-10 with global verdict: failed.",
+    "Result under replay-aware effective deltas: user-churn better, user-ltv neutral, item-incoterms worse.",
+    "Final metrics: EXP171 user-churn roc_auc=0.6906093324423707; EXP172 user-ltv mae=80.68303950697185; EXP173 item-incoterms mrr=0.7078466021825397.",
+    "Throughput conclusion: EXP173 did not reproduce the EXP165 shared-prefix long-tail bottleneck; it ran around 4.6 train steps/sec on GPUs 6,7 and final test evaluation ran around 9.44 it/s. This is a scientific or implementation-path failure, not a practical-throughput failure.",
+    "Mechanism conclusion: batched shared-prefix improved over the repeated 0.678576 plateau and the EXP159/EXP165 roughly 0.699 band, but it did not preserve EXP108's near-baseline item-incoterms signal and stayed below EXP168 late interaction and EXP164 hard-negative auxiliary.",
+    "Search-space consequence: do not relaunch this batched shared-prefix bundle or tune batching/chunk sizes as a next move. Before any further shared-prefix implementation candidate, run a score-equivalence or information-path audit against the original recursive shared-prefix scorer.",
+    "Post-failure equivalence audit completed on 2026-05-10 using item-incoterms on lab25211 GPU7 without training and without --pretrain; artifact: stage3_notes/reports/exp171_shared_prefix_equivalence_audit_2026-05-10.json.",
+    "Audit result: recursive shared-prefix and batched shared-prefix were not score-exact. At val_size=1 the prefix/final score max_abs diff was 0.049210548400878906 with mean_abs 0.013607429340481758; at val_size=8 the max_abs diff was 0.06859016418457031 with mean_abs about 0.01108121.",
+    "Audit ranking result: both audited batches had 0 top1 mismatches and 0 top5 order mismatches, so the audit did not directly reproduce a ranking flip, but it did show that EXP171 is not an exact implementation-path rewrite of EXP108's recursive scorer.",
+    "Updated interpretation: EXP171 remains failed and should not be relaunched, but its negative item-incoterms result should be treated as evidence against this non-exact batched score path, not as a clean falsification of the original recursive shared-prefix information path."
+  ],
+  "task_launches": {
+    "user-churn": {
+      "target": "lab25211",
+      "gpu": [
+        5,
+        6
+      ],
+      "window_name": "stage3-exp171",
+      "baseline_default_gpu": 5,
+      "per_rank_batch_size": 2,
+      "launch_world_size": 2,
+      "launch_mode": "packed_batch_equivalent",
+      "launch_wave": 0
+    },
+    "user-ltv": {
+      "target": "lab25211",
+      "gpu": 5,
+      "window_name": "stage3-exp172",
+      "baseline_default_gpu": 6,
+      "per_rank_batch_size": 2,
+      "launch_world_size": 1,
+      "launch_mode": "packed_batch_equivalent",
+      "launch_wave": 1
+    },
+    "item-incoterms": {
+      "target": "lab25211",
+      "gpu": [
+        6,
+        7
+      ],
+      "window_name": "stage3-exp173",
+      "baseline_default_gpu": 7,
+      "per_rank_batch_size": 2,
+      "launch_world_size": 2,
+      "launch_mode": "packed_batch_equivalent",
+      "launch_wave": 1
+    }
+  }
+}

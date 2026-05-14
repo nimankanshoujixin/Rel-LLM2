@@ -1,0 +1,110 @@
+{
+  "bundle_id": "BUNDLE-150",
+  "slug": "candidate_pairwise_query_conditioned_token_stats_safegpu_rerun",
+  "title": "Candidate pairwise query-conditioned token stats safe-GPU rerun",
+  "family": "label_interface",
+  "source_type": "ablation",
+  "launch_mode": "serial_batch_equivalent",
+  "status": "failed",
+  "serial_target": "lab25211",
+  "task_gpus": {
+    "user-churn": [
+      5,
+      6
+    ],
+    "user-ltv": [
+      5,
+      6
+    ],
+    "item-incoterms": [
+      5,
+      6
+    ]
+  },
+  "task_run_ids": {
+    "user-churn": "EXP150",
+    "user-ltv": "EXP151",
+    "item-incoterms": "EXP152"
+  },
+  "literature": {
+    "queries": [
+      "token similarity statistics candidate scorer scalable multiclass ranking",
+      "query conditioned token interaction non autoregressive candidate ranking"
+    ],
+    "papers": [
+      {
+        "title": "",
+        "url": "",
+        "claim": "",
+        "relevance": "",
+        "status": "not_required_for_ablation"
+      }
+    ]
+  },
+  "evidence": {
+    "prior_experiments": [
+      "EXP099",
+      "EXP138",
+      "EXP141",
+      "EXP144",
+      "EXP147"
+    ],
+    "why_now": "EXP147 fixed the token-stats implementation bug and produced usable user-ltv and item-incoterms metrics, but the bundle remained invalid because user-churn was again externally terminated before the first evaluation under the 4-GPU serial placement that included GPU 0. The correct next action is a clean rerun of the same scorer with an explicit safer serial GPU placement that avoids the repeated GPU 0 SIGTERM pattern, so the family can finally receive a valid three-task scientific verdict."
+  },
+  "hypothesis": "If the token-stats scorer itself is viable but the recent invalid bundles were polluted by an unstable 4-GPU serial placement involving GPU 0, then rerunning the same scorer on a safer explicit 2-GPU serial placement should yield a clean three-task verdict without changing the underlying architecture.",
+  "common_overrides": {
+    "autocomplete_decision_interface": "candidate_pairwise_query_conditioned_token_stats"
+  },
+  "task_overrides": {
+    "user-churn": {},
+    "user-ltv": {},
+    "item-incoterms": {}
+  },
+  "notes": [
+    "Keep Stage 3 finetune-only; do not introduce pretrain, loss-family changes, sampling changes, or packaging changes.",
+    "This is a clean rerun of EXP147 with no scientific change to the scorer; it only changes serial GPU placement to avoid the repeated GPU 0 SIGTERM pattern.",
+    "Use serial_batch_equivalent scheduling with explicit task_gpus so all three representative tasks run on the safer GPU 5,6 pair.",
+    "Launched on 2026-05-09 through the local Stage 3 launcher.",
+    "Completed on 2026-05-09 with global verdict: failed.",
+    "The safe GPU placement removed the earlier abnormal SIGTERM pollution, so this bundle is clean scientific evidence for the token-stats family itself.",
+    "user-churn finished clearly better, user-ltv stayed neutral inside the replay-aware noise band, and item-incoterms remained far below the strict MRR baseline."
+  ],
+  "task_launches": {
+    "user-churn": {
+      "target": "lab25211",
+      "gpu": [
+        5,
+        6
+      ],
+      "window_name": "stage3-exp150",
+      "baseline_default_gpu": 5,
+      "per_rank_batch_size": 2,
+      "launch_world_size": 2,
+      "launch_mode": "serial_batch_equivalent"
+    },
+    "user-ltv": {
+      "target": "lab25211",
+      "gpu": [
+        5,
+        6
+      ],
+      "window_name": "stage3-exp151",
+      "baseline_default_gpu": 6,
+      "per_rank_batch_size": 1,
+      "launch_world_size": 2,
+      "launch_mode": "serial_batch_equivalent"
+    },
+    "item-incoterms": {
+      "target": "lab25211",
+      "gpu": [
+        5,
+        6
+      ],
+      "window_name": "stage3-exp152",
+      "baseline_default_gpu": 7,
+      "per_rank_batch_size": 2,
+      "launch_world_size": 2,
+      "launch_mode": "serial_batch_equivalent"
+    }
+  }
+}

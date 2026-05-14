@@ -1,0 +1,71 @@
+{
+  "bundle_id": "BUNDLE-045",
+  "slug": "paper_guided_neighbor_prune",
+  "title": "Paper-guided graph retrieval pruning",
+  "family": "graph_pruning",
+  "source_type": "paper+ablation",
+  "status": "stopped",
+  "task_run_ids": {
+    "user-churn": "EXP045",
+    "user-ltv": "EXP046",
+    "item-incoterms": "EXP047"
+  },
+  "literature": {
+    "queries": [
+      "graph retrieval pruning soft prompt graph llm neighborhood budget",
+      "graph rag subgraph selection graph prompt compression noisy neighborhood"
+    ],
+    "papers": [
+      {
+        "title": "G-Retriever: Retrieval-Augmented Generation for Graph Question Answering",
+        "url": "https://arxiv.org/abs/2402.07630",
+        "claim": "Compressing too much graph structure into a small prompt channel can lose fidelity, so better subgraph selection can outperform heavier prompt-side mixing.",
+        "relevance": "Directly motivates pruning the sampled graph context before prompt construction instead of further tuning basis injection coefficients.",
+        "status": "selected"
+      },
+      {
+        "title": "Graph Retrieval-Augmented Generation: A Survey",
+        "url": "https://arxiv.org/abs/2408.08921",
+        "claim": "GraphRAG performance depends strongly on graph indexing and graph-guided retrieval choices, not only on generation-side prompting.",
+        "relevance": "Supports spending the next Stage 3 slot on the retrieval/pruning corner of the design space.",
+        "status": "selected"
+      },
+      {
+        "title": "Can we Soft Prompt LLMs for Graph Learning Tasks?",
+        "url": "https://arxiv.org/abs/2402.10359",
+        "claim": "Alignment bottlenecks can come from the graph-text interface itself, so reducing noisy graph inputs can be as important as changing downstream prompt formatting.",
+        "relevance": "Supports testing a cleaner graph prompt rather than another prompt-decoration or basis-residual tweak.",
+        "status": "selected"
+      }
+    ]
+  },
+  "evidence": {
+    "prior_experiments": [
+      "EXP033",
+      "EXP036",
+      "EXP039",
+      "EXP042"
+    ],
+    "why_now": "Three consecutive basis-side families kept reproducing the same pattern: regression can improve or stay neutral while classification regresses. That suggests the failure may sit upstream in graph context selection rather than only in basis mixing weights."
+  },
+  "hypothesis": "The current neighbor budget likely injects too much low-value graph context into the prompt, forcing the basis and projector stack to compress noisy structure. Halving the sampled neighborhood budget for each representative task should yield a cleaner graph prompt and may recover user-churn without giving back the recent user-ltv gains.",
+  "common_overrides": {},
+  "task_overrides": {
+    "user-churn": {
+      "num_neighbors": 8
+    },
+    "user-ltv": {
+      "num_neighbors": 64
+    },
+    "item-incoterms": {
+      "num_neighbors": 32
+    }
+  },
+  "notes": [
+    "Systematic rule for this first graph-pruning scan point: halve the strict-baseline num_neighbors for each representative task while leaving basis, prompt, optimizer, and evaluation settings unchanged.",
+    "This is a retrieval-side candidate, not a hyperparameter retune: it changes which graph context reaches the prompt channel.",
+    "Representative-task gate remains strict: any primary-metric regression kills the bundle.",
+    "Launched and early-killed on 2026-05-05 after the first checkpoint bundle review.",
+    "Final report verdict: failed. All three representative tasks were worse than their strict screening baselines."
+  ]
+}

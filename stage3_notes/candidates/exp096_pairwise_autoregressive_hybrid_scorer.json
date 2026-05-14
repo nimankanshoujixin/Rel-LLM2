@@ -1,0 +1,87 @@
+{
+  "bundle_id": "BUNDLE-096",
+  "slug": "pairwise_autoregressive_hybrid_scorer",
+  "title": "Pairwise autoregressive hybrid scorer",
+  "family": "label_interface",
+  "source_type": "paper+ablation",
+  "status": "stopped",
+  "task_run_ids": {
+    "user-churn": "EXP096",
+    "user-ltv": "EXP097",
+    "item-incoterms": "EXP098"
+  },
+  "literature": {
+    "queries": [
+      "graph llm hybrid candidate scorer autoregressive pairwise multiclass ranking mrr",
+      "graph rag candidate interaction plus token sequence scoring autocomplete multiclass"
+    ],
+    "papers": [
+      {
+        "title": "Graph Retrieval-Augmented Generation: A Survey",
+        "url": "https://arxiv.org/abs/2408.08921",
+        "claim": "Graph-enhanced generation quality depends on how retrieved evidence is consumed by the downstream decision interface.",
+        "relevance": "Supports combining complementary scoring views rather than forcing one compressed interface.",
+        "status": "selected"
+      },
+      {
+        "title": "G-Retriever: Retrieval-Augmented Generation for Graph Question Answering",
+        "url": "https://arxiv.org/abs/2402.07630",
+        "claim": "Graph evidence should be exposed through an interface matched to the actual answer-selection mechanism.",
+        "relevance": "Supports combining prompt-conditioned candidate interaction with explicit candidate-token scoring for autocomplete-style ranking.",
+        "status": "selected"
+      },
+      {
+        "title": "Can we Soft Prompt LLMs for Graph Learning Tasks?",
+        "url": "https://arxiv.org/abs/2402.10359",
+        "claim": "Prompt-side task interface design remains a major gain source after encoder-side changes saturate.",
+        "relevance": "Supports another scoring-interface refinement after static and pairwise label-scorer variants remained globally insufficient.",
+        "status": "selected"
+      }
+    ]
+  },
+  "evidence": {
+    "prior_experiments": [
+      "EXP081",
+      "EXP084",
+      "EXP093"
+    ],
+    "why_now": "EXP093 improved user-ltv over the stored strict baseline and slightly improved item-incoterms versus recent candidate-aware runs, but it still left salt below baseline and flipped user-churn negative. The codebase already contains a separate autoregressive multiclass candidate scorer, so the next justified step is to hybridize the new pairwise interaction path with that existing token-sequence scorer instead of inventing a new loss family."
+  },
+  "hypothesis": "The pairwise scorer captures candidate-conditioned interaction structure, but it still discards useful signal already present in the autoregressive candidate-token scoring path. A hybrid scorer that combines pairwise interaction scores with autoregressive candidate sequence scores should preserve more salt-side ranking discrimination than either path alone.",
+  "common_overrides": {
+    "autocomplete_decision_interface": "candidate_pairwise_ar_hybrid"
+  },
+  "task_overrides": {
+    "user-churn": {},
+    "user-ltv": {},
+    "item-incoterms": {}
+  },
+  "notes": [
+    "First implementation target: for autocomplete multiclass tasks only, sum a candidate-conditioned pairwise interaction score with the existing autoregressive candidate-token score.",
+    "Do not mix new loss terms, sampling tweaks, or packaging changes into the first implementation.",
+    "Launched on 2026-05-07 through the local Stage 3 launcher.",
+    "First stable orchestrator status check shows all three windows up; user-churn and user-ltv completed DB load, while item-incoterms reached normal startup logging.",
+    "Completed on 2026-05-07 with global verdict: failed.",
+    "Outcome: user-ltv and item-incoterms both improved above their strict baselines, but user-churn regressed below baseline."
+  ],
+  "task_launches": {
+    "user-churn": {
+      "target": "lab25211",
+      "gpu": 0,
+      "window_name": "stage3-exp096",
+      "baseline_default_gpu": 5
+    },
+    "user-ltv": {
+      "target": "lab25211",
+      "gpu": 5,
+      "window_name": "stage3-exp097",
+      "baseline_default_gpu": 6
+    },
+    "item-incoterms": {
+      "target": "lab25211",
+      "gpu": 6,
+      "window_name": "stage3-exp098",
+      "baseline_default_gpu": 7
+    }
+  }
+}

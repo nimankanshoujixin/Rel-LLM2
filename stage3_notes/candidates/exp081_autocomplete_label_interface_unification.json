@@ -1,0 +1,74 @@
+{
+  "bundle_id": "BUNDLE-081",
+  "slug": "autocomplete_label_interface_unification",
+  "title": "Autocomplete label-interface unification",
+  "family": "label_interface",
+  "source_type": "paper+ablation",
+  "status": "stopped",
+  "task_run_ids": {
+    "user-churn": "EXP081",
+    "user-ltv": "EXP082",
+    "item-incoterms": "EXP083"
+  },
+  "literature": {
+    "queries": [
+      "graph llm classification train inference mismatch label interface candidate scoring",
+      "graph rag candidate ranking interface structured prediction label verbalizer mismatch"
+    ],
+    "papers": [
+      {
+        "title": "Can we Soft Prompt LLMs for Graph Learning Tasks?",
+        "url": "https://arxiv.org/abs/2402.10359",
+        "claim": "The graph-to-LLM interface is a central bottleneck, so failures at the prompt/output interface can dominate over encoder-side improvements.",
+        "relevance": "Supports treating the multiclass label interface itself as the next structural bottleneck after repeated upstream partial wins.",
+        "status": "selected"
+      },
+      {
+        "title": "G-Retriever: Retrieval-Augmented Generation for Graph Question Answering",
+        "url": "https://arxiv.org/abs/2402.07630",
+        "claim": "Downstream performance depends on exposing graph evidence in a form that the language model can consume consistently.",
+        "relevance": "Supports unifying the train-time and inference-time candidate interface rather than keeping separate prompt-to-label and prompt-to-token objectives.",
+        "status": "selected"
+      },
+      {
+        "title": "Graph Retrieval-Augmented Generation: A Survey",
+        "url": "https://arxiv.org/abs/2408.08921",
+        "claim": "Graph-enhanced generation systems must align graph evidence organization with downstream consumption and decision interfaces.",
+        "relevance": "Supports a candidate-aware label-interface redesign for autocomplete-style multiclass ranking tasks.",
+        "status": "selected"
+      }
+    ]
+  },
+  "evidence": {
+    "prior_experiments": [
+      "EXP072",
+      "EXP075",
+      "EXP078"
+    ],
+    "why_now": "EXP078 was the first recent Stage 3 bundle to improve both user-churn and user-ltv while still failing on item-incoterms. Code inspection after that bundle shows a structural mismatch specific to multiclass autocomplete tasks: the active direct-supervision path optimizes integer class ids against label embeddings built from a separate raw-label verbalizer, while the codebase also contains a class-id candidate-scoring path."
+  },
+  "hypothesis": "The persistent item-incoterms regression is not only an evidence-retrieval or alignment problem. In the active autocomplete multiclass path, direct supervision uses integer class-id targets but the label scorer constructs class prototypes from a separate raw-label verbalizer such as `target_col: raw_label`. Unifying that scorer around the same class-id interface used by the target labels should reduce salt-side ranking mismatch without revisiting saturated loss or sampling families.",
+  "common_overrides": {
+    "autocomplete_label_interface": "class_id_unified"
+  },
+  "task_gpus": {
+    "user-churn": 0,
+    "user-ltv": 5,
+    "item-incoterms": 6
+  },
+  "task_overrides": {
+    "user-churn": {},
+    "user-ltv": {},
+    "item-incoterms": {}
+  },
+  "notes": [
+    "This candidate is now wired end-to-end and should be evaluated as a full representative-task bundle, even though the new label-interface path only activates on autocomplete-style multiclass tasks.",
+    "The key active-path mismatch is in model.py: autocomplete multiclass direct supervision uses sample_head vs label_head over `get_label_texts(...)`, while the targets themselves are integer class ids.",
+    "This candidate should stay finetune-only and should not reintroduce pretrain, route-aware loss, bridge-route sampling, or basis-gating scans.",
+    "Launched on 2026-05-07 after syncing the updated main.py/model.py/utils.py label-interface patch plus generated wrappers and launcher to the remote repo and /tmp.",
+    "Selected currently idle GPUs at launch time: user-churn on GPU 0, user-ltv on GPU 5, item-incoterms on GPU 6.",
+    "First orchestrator status check shows all three windows up and logs at remote DB-load stage.",
+    "Completed on 2026-05-07 with global verdict: failed.",
+    "The class-id label-interface unification reduced the salt-side gap versus the strict baseline, but item-incoterms still remained below the MRR gate and user-ltv regressed enough to invalidate the bundle."
+  ]
+}

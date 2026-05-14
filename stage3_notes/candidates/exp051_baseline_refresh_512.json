@@ -1,0 +1,44 @@
+{
+  "bundle_id": "BUNDLE-051",
+  "slug": "baseline_refresh_512",
+  "title": "512-step screening baseline refresh",
+  "family": "baseline_refresh",
+  "source_type": "ablation",
+  "status": "stopped",
+  "task_run_ids": {
+    "user-churn": "EXP051",
+    "user-ltv": "EXP052",
+    "item-incoterms": "EXP053"
+  },
+  "literature": {
+    "queries": [
+      "stage3 screening baseline refresh test subset variance 512",
+      "test subset selection variance baseline rerun graph llm 512"
+    ],
+    "papers": []
+  },
+  "evidence": {
+    "prior_experiments": [
+      "EXP010",
+      "EXP012",
+      "EXP014",
+      "EXP048",
+      "EXP049",
+      "EXP050"
+    ],
+    "why_now": "The Stage 3 screening protocol was revised to 512 evaluation/test-subset steps as the new efficiency-stability compromise. The old 128-step strict baselines and the cancelled 4096-step refresh are both protocol-mismatched for future candidate judgment."
+  },
+  "hypothesis": "No model change. Rerunning the current Stage 2 merged line under the new 512-step screening protocol should produce the protocol-matched strict baselines for the next Stage 3 candidate round.",
+  "common_overrides": {},
+  "task_overrides": {
+    "user-churn": {},
+    "user-ltv": {},
+    "item-incoterms": {}
+  },
+  "notes": [
+    "This bundle is for protocol refresh only.",
+    "Do not judge it against the old 128-step strict baselines.",
+    "Use its final subset-test metrics to replace screening_baseline_metrics in baseline_registry.json.",
+    "Completed on 2026-05-05 and used to refresh the 512-step strict screening baselines."
+  ]
+}

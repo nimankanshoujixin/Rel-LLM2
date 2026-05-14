@@ -1,0 +1,26 @@
+{
+  "job_id": "precompute_rel_amazon_gnn_repr_train_visible_amazon_gnn_cache_20260511t171512z",
+  "kind": "graph_cache",
+  "dataset": "rel-amazon",
+  "cache_profile": "gnn_repr_train_visible",
+  "target": "lab25211",
+  "created_at": "20260511T171512Z",
+  "status": "running",
+  "windows": [
+    {
+      "name": "stage3-cache-rel_amazon-0",
+      "gpu": 6,
+      "shard_index": 0,
+      "num_shards": 1,
+      "remote_script": "/tmp/stage3-cache-rel_amazon-0.sh",
+      "remote_log": "/tmp/stage3-cache-rel_amazon-0.log",
+      "script_lines": [
+        "#!/usr/bin/env bash",
+        "set -euo pipefail",
+        "cd /fs/fast/u2021201693/lym/Rel-LLM",
+        "CUDA_VISIBLE_DEVICES=6 /fs/fast/u2021201693/lym/Rel-LLM/conda/envs/bin/python -m precompute.graph_cache --dataset=rel-amazon --cache-profile=gnn_repr_train_visible --text_embedder=mpnet --text_embedder_path=./cache --embed_batch_size=256 --device=cuda:0 --num_shards=1 --shard_index=0 --skip_existing"
+      ],
+      "local_script": "G:\\RelLLM-2\\Rel-LLM\\.codex_remote\\precompute\\stage3-cache-rel_amazon-0.sh"
+    }
+  ]
+}

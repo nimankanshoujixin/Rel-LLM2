@@ -1,0 +1,55 @@
+{
+  "audit_id": "exp171_shared_prefix_equivalence_audit_2026-05-10",
+  "candidate": "stage3_notes/candidates/exp171_batched_shared_prefix_hybrid_scorer.json",
+  "purpose": "Compare the original recursive shared-prefix scorer against the EXP171 batched same-depth shared-prefix implementation on item-incoterms without training.",
+  "remote": {
+    "host": "lab25211",
+    "gpu": 7,
+    "log_path": "/tmp/audit-exp171-shared-prefix-equivalence.log",
+    "used_pretrain": false
+  },
+  "runs": [
+    {
+      "timestamp": "2026-05-10T09:36:01+08:00",
+      "val_size": 1,
+      "batch_size": 1,
+      "candidate_count": 13,
+      "prefix_diff": {
+        "max_abs": 0.049210548400878906,
+        "mean_abs": 0.013607429340481758,
+        "numel": 13
+      },
+      "final_diff": {
+        "max_abs": 0.049210548400878906,
+        "mean_abs": 0.013607429340481758,
+        "numel": 13
+      },
+      "ranking": {
+        "top1_mismatches": 0,
+        "top5_order_mismatches": 0
+      }
+    },
+    {
+      "timestamp": "2026-05-10T09:37:29+08:00",
+      "val_size": 8,
+      "batch_size": 8,
+      "candidate_count": 13,
+      "prefix_diff": {
+        "max_abs": 0.06859016418457031,
+        "mean_abs": 0.0110812122002244,
+        "numel": 104
+      },
+      "final_diff": {
+        "max_abs": 0.06859016418457031,
+        "mean_abs": 0.011081214994192123,
+        "numel": 104
+      },
+      "ranking": {
+        "top1_mismatches": 0,
+        "top5_order_mismatches": 0
+      }
+    }
+  ],
+  "conclusion": "The batched shared-prefix implementation is not score-exact relative to the recursive scorer: the prefix/final score surfaces differ by up to roughly 0.069 log-score on the audited item-incoterms batches. The audited batches did not show top1 or top5 ordering mismatches, so this does not by itself prove ranking-path collapse, but it is enough to classify EXP171 as a non-exact implementation-path rewrite rather than a clean rejection of the original EXP108 shared-prefix information path.",
+  "search_space_consequence": "Do not relaunch EXP171 or tune batching/chunk sizes. Any future shared-prefix implementation must first be score-equivalent or explicitly justify the changed score surface while preserving throughput. Otherwise continue with different paper- or prior-ablation-backed scalable Stage4-compatible candidate-aware autocomplete scorers."
+}

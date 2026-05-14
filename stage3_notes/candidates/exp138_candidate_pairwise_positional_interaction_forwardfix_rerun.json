@@ -1,0 +1,96 @@
+{
+  "bundle_id": "BUNDLE-138",
+  "slug": "candidate_pairwise_positional_interaction_forwardfix_rerun",
+  "title": "Candidate pairwise positional interaction forward-fix rerun",
+  "family": "label_interface",
+  "source_type": "ablation",
+  "launch_mode": "serial_batch_equivalent",
+  "status": "failed",
+  "task_run_ids": {
+    "user-churn": "EXP138",
+    "user-ltv": "EXP139",
+    "item-incoterms": "EXP140"
+  },
+  "literature": {
+    "queries": [
+      "label token order pooling candidate pairwise scorer scalable multiclass graph llm",
+      "cheap token sequence label encoder pairwise ranking multiclass candidate aware scorer"
+    ],
+    "papers": [
+      {
+        "title": "",
+        "url": "",
+        "claim": "",
+        "relevance": "",
+        "status": "not_required_for_ablation"
+      }
+    ]
+  },
+  "evidence": {
+    "prior_experiments": [
+      "EXP099",
+      "EXP126",
+      "EXP129",
+      "EXP132",
+      "EXP135"
+    ],
+    "why_now": "EXP135 was still implementation-blocked rather than scientifically resolved because candidate_pairwise_positional_interaction was accidentally routed through the top-k dual hybrid forward path on item-incoterms. The hypothesis remains justified by EXP129 and the cheap positional label pooler implementation is otherwise intact, so the correct next action is a clean rerun that consumes only the forward-routing fix."
+  },
+  "hypothesis": "If the main weakness of the fast pairwise scorer is that its label representations throw away token order by mean-pooling candidate tokens, then replacing that mean pool with a tiny position-aware attention pool should recover part of the candidate-token signal while keeping the scorer in the scalable non-autoregressive regime.",
+  "common_overrides": {
+    "autocomplete_decision_interface": "candidate_pairwise_positional_interaction"
+  },
+  "task_overrides": {
+    "user-churn": {},
+    "user-ltv": {},
+    "item-incoterms": {}
+  },
+  "notes": [
+    "Keep Stage 3 finetune-only; do not introduce pretrain, loss-family changes, sampling changes, or packaging changes.",
+    "This is a clean rerun of EXP135 after fixing the forward-routing bug that sent candidate_pairwise_positional_interaction into the top-k dual hybrid branch on item-incoterms.",
+    "No scientific change relative to EXP132 or EXP135; the rerun exists only to recover the intended salt-side evidence.",
+    "Use serial_batch_equivalent scheduling by default.",
+    "Launched on 2026-05-09 through the local Stage 3 launcher.",
+    "Completed on 2026-05-09 with global verdict: failed.",
+    "user-churn finished clearly better, user-ltv stayed inside its replay-aware neutral band, and item-incoterms fell far below the strict MRR baseline even after the forward-routing fix.",
+    "Conclusion: static position-aware label pooling does not recover enough salt-side candidate-token signal to keep this family on the active frontier."
+  ],
+  "task_launches": {
+    "user-churn": {
+      "target": "lab25211",
+      "gpu": [
+        5,
+        6
+      ],
+      "window_name": "stage3-exp138",
+      "baseline_default_gpu": 5,
+      "per_rank_batch_size": 2,
+      "launch_world_size": 2,
+      "launch_mode": "serial_batch_equivalent"
+    },
+    "user-ltv": {
+      "target": "lab25211",
+      "gpu": [
+        5,
+        6
+      ],
+      "window_name": "stage3-exp139",
+      "baseline_default_gpu": 6,
+      "per_rank_batch_size": 1,
+      "launch_world_size": 2,
+      "launch_mode": "serial_batch_equivalent"
+    },
+    "item-incoterms": {
+      "target": "lab25211",
+      "gpu": [
+        5,
+        6
+      ],
+      "window_name": "stage3-exp140",
+      "baseline_default_gpu": 7,
+      "per_rank_batch_size": 2,
+      "launch_world_size": 2,
+      "launch_mode": "serial_batch_equivalent"
+    }
+  }
+}

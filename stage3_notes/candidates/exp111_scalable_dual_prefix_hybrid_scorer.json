@@ -1,0 +1,68 @@
+{
+  "bundle_id": "BUNDLE-111",
+  "slug": "scalable_dual_prefix_hybrid_scorer",
+  "title": "Scalable dual-prefix hybrid scorer",
+  "family": "label_interface",
+  "source_type": "ablation",
+  "status": "implementation_blocked",
+  "task_run_ids": {
+    "user-churn": "EXP111",
+    "user-ltv": "EXP112",
+    "item-incoterms": "EXP113"
+  },
+  "literature": {
+    "queries": [
+      "candidate aware multiclass dual view semantic raw label class id shared prefix scorer scalable hybrid",
+      "autocomplete multiclass shared prefix semantic label token scoring dual view pairwise interaction scalable"
+    ],
+    "papers": []
+  },
+  "evidence": {
+    "prior_experiments": [
+      "EXP084",
+      "EXP093",
+      "EXP099",
+      "EXP108"
+    ],
+    "why_now": "EXP084 showed that class-id and raw-label views both matter but static fusion is too weak. EXP093 and EXP099 established that candidate-aware interaction plus candidate-token signal is the right architecture family. EXP108 then showed that a scalable shared-prefix rewrite over class-id token sequences alone preserves some salt-side signal but is still too weak, so the next justified step is to restore a second semantic candidate-token view while staying non-exhaustive."
+  },
+  "hypothesis": "Keep the scalable shared-prefix rewrite, but score both class-id token prefixes and raw-label semantic token prefixes, then fuse those two shared-prefix candidate-token views on top of the pairwise scorer. This should retain more of the replay-confirmed hybrid signal than class-id-only prefix scoring while remaining scalable and avoiding O(L*C) exhaustive rollout.",
+  "common_overrides": {
+    "autocomplete_decision_interface": "candidate_pairwise_dual_shared_prefix_hybrid"
+  },
+  "task_overrides": {
+    "user-churn": {},
+    "user-ltv": {},
+    "item-incoterms": {}
+  },
+  "notes": [
+    "This candidate is finetune-only and stays inside the standard three-task Stage 3 subset bundle.",
+    "The design goal is to keep the scalable shared-prefix path but restore a semantic raw-label candidate-token view without returning to exhaustive per-candidate rollout.",
+    "Launched on 2026-05-08 through the local Stage 3 launcher.",
+    "Resolved idle-GPU placement at launch time: user-churn -> lab25211 GPU 0, user-ltv -> lab25211 GPU 5, item-incoterms -> lab25211 GPU 6.",
+    "First orchestrator status check after launch showed all three windows up and logs in DB-load startup.",
+    "Completed on 2026-05-08 as an implementation-blocked bundle.",
+    "user-churn and user-ltv finished, but item-incoterms crashed before the first evaluation because candidate_pairwise_scorer was not instantiated on the dual-prefix path.",
+    "Treat this as implementation failure rather than scientific evidence against the dual-prefix family."
+  ],
+  "task_launches": {
+    "user-churn": {
+      "target": "lab25211",
+      "gpu": 0,
+      "window_name": "stage3-exp111",
+      "baseline_default_gpu": 5
+    },
+    "user-ltv": {
+      "target": "lab25211",
+      "gpu": 5,
+      "window_name": "stage3-exp112",
+      "baseline_default_gpu": 6
+    },
+    "item-incoterms": {
+      "target": "lab25211",
+      "gpu": 6,
+      "window_name": "stage3-exp113",
+      "baseline_default_gpu": 7
+    }
+  }
+}

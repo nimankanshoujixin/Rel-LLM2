@@ -1,0 +1,59 @@
+{
+  "candidate": "stage3_notes\\candidates\\exp075_confidence_calibrated_basis_gating.json",
+  "tasks": {
+    "user-churn": {
+      "run_id": "EXP075",
+      "log_path": "G:\\RelLLM-2\\Rel-LLM\\stage3_notes\\reports\\log_cache\\stage3-exp075.log",
+      "metrics": {
+        "average_precision": 0.6899196645716785,
+        "accuracy": 0.6796875,
+        "f1": 0.764367816091954,
+        "roc_auc": 0.6494774190441023
+      },
+      "comparison": {
+        "primary_metric": "roc_auc",
+        "current": 0.6494774190441023,
+        "baseline": 0.6540209032382359,
+        "signed_gain": -0.00454348419413364,
+        "delta_threshold": 0.001,
+        "verdict": "worse"
+      }
+    },
+    "user-ltv": {
+      "run_id": "EXP076",
+      "log_path": "G:\\RelLLM-2\\Rel-LLM\\stage3_notes\\reports\\log_cache\\stage3-exp076.log",
+      "metrics": {
+        "r2": -0.32177561281514144,
+        "mae": 84.94861053811037,
+        "rmse": 145.64104712533273
+      },
+      "comparison": {
+        "primary_metric": "mae",
+        "current": 84.94861053811037,
+        "baseline": 79.27257269903086,
+        "signed_gain": -5.6760378390795125,
+        "delta_threshold": 0.001,
+        "verdict": "worse"
+      }
+    },
+    "item-incoterms": {
+      "run_id": "EXP077",
+      "log_path": "G:\\RelLLM-2\\Rel-LLM\\stage3_notes\\reports\\log_cache\\stage3-exp077.log",
+      "metrics": {
+        "accuracy": 0.71484375,
+        "macro_f1": 0.12715021559023196,
+        "micro_f1": 0.71484375,
+        "mrr": 0.7983677292759324
+      },
+      "comparison": {
+        "primary_metric": "mrr",
+        "current": 0.7983677292759324,
+        "baseline": 0.8147880873466811,
+        "signed_gain": -0.01642035807074871,
+        "delta_threshold": 0.001,
+        "verdict": "worse"
+      }
+    }
+  },
+  "global_verdict": "failed"
+}

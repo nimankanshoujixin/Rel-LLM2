@@ -1,0 +1,59 @@
+{
+  "candidate": "stage3_notes\\candidates\\exp078_split_local_global_graph_token_packaging.json",
+  "tasks": {
+    "user-churn": {
+      "run_id": "EXP078",
+      "log_path": "G:\\RelLLM-2\\Rel-LLM\\stage3_notes\\reports\\log_cache\\stage3-exp078.log",
+      "metrics": {
+        "average_precision": 0.7002034190887916,
+        "accuracy": 0.650390625,
+        "f1": 0.7765293383270911,
+        "roc_auc": 0.6575208309920207
+      },
+      "comparison": {
+        "primary_metric": "roc_auc",
+        "current": 0.6575208309920207,
+        "baseline": 0.6540209032382359,
+        "signed_gain": 0.003499927753784826,
+        "delta_threshold": 0.001,
+        "verdict": "better"
+      }
+    },
+    "user-ltv": {
+      "run_id": "EXP079",
+      "log_path": "G:\\RelLLM-2\\Rel-LLM\\stage3_notes\\reports\\log_cache\\stage3-exp079.log",
+      "metrics": {
+        "r2": -0.16332260308390079,
+        "mae": 78.98161479765551,
+        "rmse": 136.63281265258124
+      },
+      "comparison": {
+        "primary_metric": "mae",
+        "current": 78.98161479765551,
+        "baseline": 79.27257269903086,
+        "signed_gain": 0.29095790137535005,
+        "delta_threshold": 0.001,
+        "verdict": "better"
+      }
+    },
+    "item-incoterms": {
+      "run_id": "EXP080",
+      "log_path": "G:\\RelLLM-2\\Rel-LLM\\stage3_notes\\reports\\log_cache\\stage3-exp080.log",
+      "metrics": {
+        "accuracy": 0.71875,
+        "macro_f1": 0.13942109782058973,
+        "micro_f1": 0.71875,
+        "mrr": 0.8017376612103174
+      },
+      "comparison": {
+        "primary_metric": "mrr",
+        "current": 0.8017376612103174,
+        "baseline": 0.8147880873466811,
+        "signed_gain": -0.013050426136363646,
+        "delta_threshold": 0.001,
+        "verdict": "worse"
+      }
+    }
+  },
+  "global_verdict": "failed"
+}

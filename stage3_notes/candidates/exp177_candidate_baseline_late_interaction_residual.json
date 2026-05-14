@@ -1,0 +1,124 @@
+{
+  "bundle_id": "BUNDLE-177",
+  "slug": "candidate_baseline_late_interaction_residual",
+  "title": "Baseline anchored late-interaction residual scorer",
+  "family": "label_interface",
+  "source_type": "paper+ablation",
+  "launch_mode": "packed_batch_equivalent",
+  "status": "failed",
+  "gpu_exclude": [
+    0
+  ],
+  "task_cost_weights": {
+    "user-churn": 1.0,
+    "user-ltv": 1.2,
+    "item-incoterms": 2.5
+  },
+  "task_run_ids": {
+    "user-churn": "EXP177",
+    "user-ltv": "EXP178",
+    "item-incoterms": "EXP179"
+  },
+  "literature": {
+    "queries": [
+      "ColBERT late interaction MaxSim token-level retrieval candidate scoring",
+      "residual learning preserve baseline scorer bounded residual ranking"
+    ],
+    "papers": [
+      {
+        "title": "ColBERTv2: Effective and Efficient Retrieval via Lightweight Late Interaction",
+        "url": "https://arxiv.org/abs/2112.01488",
+        "claim": "Late interaction keeps token-granular representations and scores candidates with lightweight token-level matching instead of collapsing each side to one vector.",
+        "relevance": "This motivates using prompt-token to candidate-label-token interaction as a bounded residual over the raw-label baseline score surface, preserving token-level evidence without per-candidate autoregressive rollout.",
+        "status": "selected"
+      },
+      {
+        "title": "PLAID: An Efficient Engine for Late Interaction Retrieval",
+        "url": "https://arxiv.org/abs/2205.09707",
+        "claim": "Late-interaction retrieval can be made practical with tensorized and optimized scoring rather than recursive candidate decoding.",
+        "relevance": "This supports the throughput gate for a Stage 3 scorer that remains candidate-aware but avoids the shared-prefix long-tail bottleneck.",
+        "status": "selected"
+      }
+    ]
+  },
+  "evidence": {
+    "prior_experiments": [
+      "EXP099",
+      "EXP108",
+      "EXP159",
+      "EXP168",
+      "EXP171",
+      "EXP174"
+    ],
+    "why_now": "EXP099 and EXP108 remain the strongest evidence that explicit candidate-token signal matters, but their exhaustive or shared-prefix forms are not acceptable final paths. EXP159 showed that preserving the raw-label baseline score surface with a bounded pairwise residual softened but did not solve the salt-side collapse. EXP168 showed naive late interaction improves over the repeated 0.678576 plateau but is still far below baseline. EXP171/174 further weakened shared-prefix and Poly-encoder follow-ups. The next justified diagnostic is therefore not a residual-scale scan: keep the raw-label baseline scorer as the main surface and add only a centered, tanh-bounded late-interaction token residual."
+  },
+  "hypothesis": "If naive late interaction loses too much of the already-useful raw-label baseline ordering, then treating late interaction as a small centered residual rather than a replacement/additive main scorer should preserve the salt-side baseline surface while still exposing token-level sample-candidate evidence. The interface remains finetune-only, candidate-aware, non-autoregressive, and Stage4-compatible because it uses one prompt encoding plus batched candidate-token matching rather than target-database-only fixed heads or O(L*C) autoregressive rollout.",
+  "common_overrides": {
+    "autocomplete_decision_interface": "candidate_baseline_late_interaction_residual",
+    "autocomplete_residual_scale": 0.1
+  },
+  "task_overrides": {
+    "user-churn": {},
+    "user-ltv": {},
+    "item-incoterms": {}
+  },
+  "notes": [
+    "Keep Stage 3 finetune-only; do not use --pretrain.",
+    "This is not an autocomplete_residual_scale scan: use the existing fixed residual scale only to test the information path.",
+    "This candidate is different from EXP159 because the residual is token-level late interaction over selected prompt tokens and class-id/raw-label candidate tokens, not another pairwise pooled-label feature residual.",
+    "This candidate is different from EXP168 because the raw-label baseline score surface remains the main decision surface and the late-interaction contribution is centered and tanh-bounded.",
+    "Do not add autocomplete_rank_auxiliary, change autocomplete_poly_codes, scan token budget, or alter prompt/sampling/basis settings in this bundle.",
+    "Before launch, run py_compile, git diff --check, JSON validation, and a remote item-incoterms shape/throughput sanity check.",
+    "Throughput gate: do not launch EXP177/178/179 if item-incoterms shows a long-tail signature comparable to the old shared-prefix roughly 1.25 train steps/sec path.",
+    "Exclude GPU0 for this candidate only because recent EXP162 evidence showed a pre-eval SIGTERM when user-churn used GPU0 as local_rank 0; global pipeline_config keeps gpu_exclude empty.",
+    "Completed and finalized on 2026-05-11 with global verdict: failed.",
+    "Final metrics: EXP177 user-churn roc_auc=0.684794629214976; EXP178 user-ltv mae=78.94613023620798; EXP179 item-incoterms mrr=0.7044836795691288.",
+    "Result under replay-aware effective deltas: user-churn better, user-ltv neutral, item-incoterms worse.",
+    "Throughput evidence: EXP179 item-incoterms ran on four ranks with per-rank batch 1 at roughly 7.4 train steps/sec after warmup, i.e. about 29.6 effective train items/sec; final test progress was around 16.38 it/sec. This is not a practical-throughput failure.",
+    "Interpretation: baseline-anchored late interaction did not preserve the salt-side score surface. It stayed above the repeated 0.678576 collapse band but below EXP168 late interaction and far below the strict baseline mrr=0.8147880873466811, so this is a fixed-screen scientific failure rather than a retune-plausible signal.",
+    "Search-space consequence: do not hand-scan autocomplete_residual_scale, late-interaction token budget, autocomplete_poly_codes, ranking margin, or auxiliary weight. Move to a different paper- or ablation-backed Stage4-compatible candidate-aware information path."
+  ],
+  "task_launches": {
+    "user-churn": {
+      "target": "lab25211",
+      "gpu": [
+        3,
+        4
+      ],
+      "window_name": "stage3-exp177",
+      "baseline_default_gpu": 5,
+      "per_rank_batch_size": 2,
+      "launch_world_size": 2,
+      "launch_mode": "packed_batch_equivalent",
+      "launch_wave": 0
+    },
+    "user-ltv": {
+      "target": "lab25211",
+      "gpu": [
+        5,
+        7
+      ],
+      "window_name": "stage3-exp178",
+      "baseline_default_gpu": 6,
+      "per_rank_batch_size": 1,
+      "launch_world_size": 2,
+      "launch_mode": "packed_batch_equivalent",
+      "launch_wave": 0
+    },
+    "item-incoterms": {
+      "target": "lab25211",
+      "gpu": [
+        3,
+        4,
+        5,
+        7
+      ],
+      "window_name": "stage3-exp179",
+      "baseline_default_gpu": 7,
+      "per_rank_batch_size": 1,
+      "launch_world_size": 4,
+      "launch_mode": "packed_batch_equivalent",
+      "launch_wave": 1
+    }
+  }
+}

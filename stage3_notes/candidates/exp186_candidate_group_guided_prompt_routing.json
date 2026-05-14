@@ -1,0 +1,129 @@
+{
+  "bundle_id": "BUNDLE-186",
+  "slug": "candidate_group_guided_prompt_routing",
+  "title": "Candidate-set guided prompt group routing",
+  "family": "candidate_aware_evidence_routing",
+  "source_type": "paper+ablation",
+  "launch_mode": "packed_batch_equivalent",
+  "status": "failed",
+  "gpu_exclude": [
+    0
+  ],
+  "task_cost_weights": {
+    "user-churn": 1.0,
+    "user-ltv": 1.2,
+    "item-incoterms": 2.0
+  },
+  "task_run_ids": {
+    "user-churn": "EXP186",
+    "user-ltv": "EXP187",
+    "item-incoterms": "EXP188"
+  },
+  "literature": {
+    "queries": [
+      "GraphRAG query focused graph retrieval evidence ordering",
+      "G-Retriever relevant subgraph retrieval graph prompt",
+      "Lost in the Middle language models long context order sensitivity"
+    ],
+    "papers": [
+      {
+        "title": "G-Retriever: Retrieval-Augmented Generation for Graph Question Answering",
+        "url": "https://arxiv.org/abs/2402.07630",
+        "claim": "Graph evidence should be selected according to the query before generation rather than consumed as undifferentiated graph context.",
+        "relevance": "EXP180 and EXP183 show the active signal is in candidate-aware prompt evidence selection, but the salt-side task is sensitive to how that evidence is ordered.",
+        "status": "selected"
+      },
+      {
+        "title": "Graph Retrieval-Augmented Generation: A Survey",
+        "url": "https://arxiv.org/abs/2408.08921",
+        "claim": "GraphRAG pipelines separate graph-guided retrieval from graph-enhanced generation and emphasize query-relevant evidence organization.",
+        "relevance": "A group-level routing pass is still graph-guided retrieval/organization before frozen-LLM consumption, without changing scorer form or prompt length.",
+        "status": "selected"
+      },
+      {
+        "title": "Lost in the Middle: How Language Models Use Long Contexts",
+        "url": "https://arxiv.org/abs/2307.03172",
+        "claim": "LLM use of evidence is sensitive to context position and ordering, so relevance ranking can help or hurt depending on how it disrupts useful structure.",
+        "relevance": "EXP183 suggests token-level reordering plus sample conditioning destroys salt-side structural order. Routing whole metadata groups while preserving intra-group order tests a less destructive evidence-ordering mechanism.",
+        "status": "selected"
+      }
+    ]
+  },
+  "evidence": {
+    "prior_experiments": [
+      "EXP180",
+      "EXP183",
+      "EXP185"
+    ],
+    "why_now": "EXP180 candidate-set-only token routing failed fixed screening but improved item-incoterms to mrr=0.7432317302922772, above repeated scorer-collapse bands. EXP183 sample-conditioned routing improved user-churn but pushed item-incoterms down to mrr=0.6782075427827381, close to the known collapse band. The ablation consequence is to keep candidate-set-only guidance but reduce prompt order destruction by routing metadata groups/blocks instead of individual tokens."
+  },
+  "hypothesis": "For autocomplete multiclass tasks, candidate-set guidance is useful but fine-grained token reordering can destroy route-local structural evidence that item-incoterms needs. Sorting only metadata groups by candidate-set relevance while preserving original order inside each group should keep the useful EXP180 candidate-aware signal, avoid the EXP183 sample-conditioning collapse, keep prompt length fixed, leave the scorer unchanged, and remain Stage4-compatible through candidate-set proxy evidence-routing episodes.",
+  "common_overrides": {
+    "prompt_candidate_group_routing": true
+  },
+  "task_overrides": {
+    "user-churn": {},
+    "user-ltv": {},
+    "item-incoterms": {}
+  },
+  "notes": [
+    "Draft created after EXP183/184/185 finalized failed.",
+    "Keep Stage 3 finetune-only; do not use --pretrain.",
+    "This is not a scorer near-variant: it changes only graph prompt evidence ordering before frozen-LLM consumption.",
+    "Do not scan routing top-k, prompt token budgets, residual scales, batching/chunk sizes, rank auxiliary weights, or route sampling.",
+    "Implementation plan: reuse the EXP180 candidate-set query from class-id/raw-label text embeddings, compute relevance for existing prompt tokens, aggregate relevance by token metadata group, sort groups by mean relevance, and preserve the original token order inside each group.",
+    "No prompt-length inflation and no O(L*C) LLM rollout; candidate text representations are computed once and group routing is tensorized over the existing prompt tokens.",
+    "Stage4 compatibility story: candidate-set group relevance can be learned later from source-database proxy categorical-value retrieval/ranking episodes without target-database-only fixed heads.",
+    "Implementation added on 2026-05-11 via prompt_candidate_group_routing: candidate-set relevance is aggregated by metadata group and groups are sorted while preserving original token order inside each group.",
+    "Pre-launch validation completed on 2026-05-11: py_compile, git diff --check, JSON validation, and remote item-incoterms shape/throughput sanity all passed.",
+    "Remote sanity check completed on 2026-05-11: a 64-step item-incoterms finetune-only run on lab25211 GPU6 completed cleanly with no --pretrain, reached roughly 6.0 train step/s with batch_size=4 (about 24 effective train items/sec), and eval/test ran around 12.15 it/s with val_size=1.",
+    "Launched on 2026-05-11 with packed batch-equivalent placement: EXP186 user-churn on GPUs 4,6 with per-rank batch 2 wave 0; EXP187 user-ltv on GPUs 4,6 with per-rank batch 1 wave 1; EXP188 item-incoterms on GPUs 4,6 with per-rank batch 2 wave 2.",
+    "First post-launch status: EXP186 is running, EXP187/188 are queued for later waves, and orchestrator recommends keep_watching.",
+    "Final metrics: EXP186 user-churn roc_auc=0.6841889309621224; EXP187 user-ltv mae=77.78193103098369; EXP188 item-incoterms mrr=0.6782075427827381.",
+    "Final verdict under replay-aware effective deltas: user-churn better, user-ltv neutral, item-incoterms worse; global verdict failed.",
+    "Throughput was acceptable: EXP188 ran on two ranks with per-rank batch 2 at about 6.5 train step/s, roughly 26 effective train items/sec, and final test ran around 12.07 it/s with val_size=1.",
+    "Interpretation: candidate-set group routing did not preserve EXP180's partial salt-side signal. It exactly repeated EXP183's item-incoterms collapse band, so further prompt evidence routing order variants should be treated as saturated unless a new mechanism changes the information path beyond routing/reordering existing tokens.",
+    "Search-space consequence: pause manual candidate-aware prompt evidence routing variants. EXP180 remains a fixed-screen failed but retune-plausible signal; EXP183 and EXP186 show that adding sample conditioning or preserving group order does not stabilize it. The next action should be architecture-consistency review rather than another scorer/routing small variant."
+  ],
+  "task_launches": {
+    "user-churn": {
+      "target": "lab25211",
+      "gpu": [
+        4,
+        6
+      ],
+      "window_name": "stage3-exp186",
+      "baseline_default_gpu": 5,
+      "per_rank_batch_size": 2,
+      "launch_world_size": 2,
+      "launch_mode": "packed_batch_equivalent",
+      "launch_wave": 0
+    },
+    "user-ltv": {
+      "target": "lab25211",
+      "gpu": [
+        4,
+        6
+      ],
+      "window_name": "stage3-exp187",
+      "baseline_default_gpu": 6,
+      "per_rank_batch_size": 1,
+      "launch_world_size": 2,
+      "launch_mode": "packed_batch_equivalent",
+      "launch_wave": 1
+    },
+    "item-incoterms": {
+      "target": "lab25211",
+      "gpu": [
+        4,
+        6
+      ],
+      "window_name": "stage3-exp188",
+      "baseline_default_gpu": 7,
+      "per_rank_batch_size": 2,
+      "launch_world_size": 2,
+      "launch_mode": "packed_batch_equivalent",
+      "launch_wave": 2
+    }
+  }
+}

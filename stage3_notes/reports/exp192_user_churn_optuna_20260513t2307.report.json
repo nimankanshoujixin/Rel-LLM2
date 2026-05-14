@@ -1,0 +1,54 @@
+{
+  "study_name": "exp192_user_churn_optuna_20260513t2307",
+  "task": "user-churn",
+  "dataset": "rel-amazon",
+  "status": "completed_with_manual_sync",
+  "trial_count": 24,
+  "best_trial": 7,
+  "best_value": 0.6952360855480397,
+  "best_params": {
+    "lr": 0.00021677846214357684,
+    "wd": 0.0016973078532467015,
+    "dropout": 0.4480456499617466,
+    "channels": 256,
+    "num_layers": 2,
+    "num_neighbors": 16,
+    "aggr": "mean",
+    "temporal_strategy": "last",
+    "batch_size": 3,
+    "w_pos": 1.7768682564439144,
+    "basis_residual_alpha": 0.23783495141695055,
+    "basis_graph_alpha": 0.05552695261768256,
+    "basis_tau": 0.037659918741014,
+    "basis_lambda_tok": 0.31528154175096096,
+    "basis_lambda_g": 2.470540427082327,
+    "basis_lambda_sharp": 0.0009324140221663494
+  },
+  "final_test": {
+    "best_val_metrics": {
+      "average_precision": 0.7747995199277922,
+      "accuracy": 0.67333984375,
+      "f1": 0.7723715549506635,
+      "roc_auc": 0.6352167302911932
+    },
+    "best_test_subset_metrics": {
+      "average_precision": 0.7263779952094107,
+      "accuracy": 0.6640625,
+      "f1": 0.7175697865353038,
+      "roc_auc": 0.6919066990226765
+    },
+    "best_test_metrics": {
+      "average_precision": 0.7236622468421053,
+      "accuracy": 0.6535089588928201,
+      "f1": 0.7253997103662313,
+      "roc_auc": 0.6681287838379838
+    }
+  },
+  "notes": [
+    "Phase 1 Optuna only; no final full test was bundled.",
+    "Artifact compatibility was preserved with channels=256, num_layers=2, aggr=mean.",
+    "The remote final-test-only run completed the full test and printed final metrics, but the wrapper stalled before the final save/exit message.",
+    "Final metrics were recovered from the synced best_trial_test.log and persisted into the local best_trial.json after confirming the remote process chain was only stuck in post-test cleanup.",
+    "Phase 2 final-test-only confirmation did not beat the stored user-churn full-test reference."
+  ]
+}

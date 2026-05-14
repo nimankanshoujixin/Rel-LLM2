@@ -1,0 +1,113 @@
+{
+  "bundle_id": "BUNDLE-174",
+  "slug": "candidate_pairwise_poly_encoder",
+  "title": "Candidate pairwise Poly-encoder scorer",
+  "family": "label_interface",
+  "source_type": "paper+ablation",
+  "launch_mode": "packed_batch_equivalent",
+  "status": "failed",
+  "gpu_exclude": [
+    0
+  ],
+  "task_cost_weights": {
+    "user-churn": 1.0,
+    "user-ltv": 1.2,
+    "item-incoterms": 2.0
+  },
+  "task_run_ids": {
+    "user-churn": "EXP174",
+    "user-ltv": "EXP175",
+    "item-incoterms": "EXP176"
+  },
+  "literature": {
+    "queries": [
+      "Poly-encoders multi-sentence scoring efficient candidate scoring",
+      "candidate ranking poly encoder context codes response selection"
+    ],
+    "papers": [
+      {
+        "title": "Poly-encoders: Architectures and Pre-training Strategies for Fast and Accurate Multi-sentence Scoring",
+        "url": "https://arxiv.org/abs/1905.01969",
+        "claim": "Poly-encoders use a small fixed set of learned context codes to produce multiple context vectors, then let each candidate attend over those codes for efficient candidate-aware scoring.",
+        "relevance": "This matches the Stage 3 need for a richer sample-candidate interaction than single-vector pooling while avoiding exhaustive per-candidate LLM rollout and the slow shared-prefix recursion path.",
+        "status": "primary_reference"
+      }
+    ]
+  },
+  "evidence": {
+    "prior_experiments": [
+      "EXP093",
+      "EXP099",
+      "EXP108",
+      "EXP156",
+      "EXP159",
+      "EXP162",
+      "EXP168",
+      "EXP171"
+    ],
+    "why_now": "EXP093 established that candidate-conditioned pairwise interaction carries real signal. EXP099/EXP108 showed that candidate-token evidence is the strongest salt-side signal but exhaustive or recursive token scoring is not the right scalable endpoint. EXP156/EXP159 exhausted token-stat and residual near-neighbors, EXP162 showed direct hard-negative pressure is directionally useful but insufficient, EXP168 showed naive hidden-token late interaction is scientifically insufficient, and the EXP171 audit showed the batched shared-prefix rewrite is not score-exact. A Poly-encoder scorer is therefore the next different information path: fixed-size learned context codes preserve multi-vector sample structure and candidate-conditioned scoring without O(L*C) LLM rollout."
+  },
+  "hypothesis": "A Poly-encoder autocomplete scorer can recover more of the candidate-token discrimination lost by single-vector pairwise and naive MaxSim late interaction by extracting a small learned set of prompt context vectors, while keeping inference complexity at O(L*m + C*m) for fixed m and preserving a Stage4-compatible sample-candidate ranking interface.",
+  "common_overrides": {
+    "autocomplete_decision_interface": "candidate_pairwise_poly_encoder",
+    "autocomplete_poly_codes": 16
+  },
+  "task_overrides": {
+    "user-churn": {},
+    "user-ltv": {},
+    "item-incoterms": {}
+  },
+  "notes": [
+    "Keep Stage 3 finetune-only; do not use --pretrain.",
+    "This is not a pooled-label/token-stat near variant: it uses fixed learned context codes over prompt token states and candidate-conditioned attention over those codes.",
+    "Do not hand-scan autocomplete_poly_codes; expose the knob for future Optuna only if the structural family clears screening.",
+    "This candidate must pass py_compile, git diff --check, JSON validation, and a remote item-incoterms shape/throughput sanity check before launch.",
+    "Throughput gate: do not launch EXP174/175/176 if item-incoterms shows a long-tail signature comparable to the old shared-prefix roughly 1.25 train steps/sec path.",
+    "Exclude GPU0 for this candidate only because recent EXP162 evidence showed a pre-eval SIGTERM when user-churn used GPU0 as local rank 0; global pipeline_config keeps gpu_exclude empty.",
+    "Static validation on 2026-05-10: python -m py_compile passed for tune_hyperparameters.py, main.py, model.py, stage3_research.py, and stage3_orchestrator.py; git diff --check passed; candidate JSON validated.",
+    "Remote item-incoterms sanity check completed on 2026-05-10: 64-step single-GPU run on lab25211 GPU7 entered training, completed cleanly, and did not use --pretrain.",
+    "Sanity throughput evidence: after warmup the single-GPU training loop reached roughly 3.5-3.7 train steps/sec with batch_size=4, i.e. about 14.0-14.8 train items/sec. Validation used val_size=1 and ran around 6.7-6.8 eval items/sec. This clears the practical throughput gate relative to the old shared-prefix long-tail signature, though it is slower than late interaction and should be watched closely.",
+    "Sanity conclusion: launch is allowed once enough GPUs are idle for packed_batch_equivalent scheduling; at the 2026-05-10T10:20+08:00 check, lab25211 had no GPUs below the configured idle memory threshold, so the full bundle was not launched in this pass.",
+    "Finalized on 2026-05-10: EXP174 user-churn was better with roc_auc=0.6593831778701815, EXP175 user-ltv was neutral with mae=82.46907187100966 under the wide replay-aware band, and EXP176 item-incoterms was worse with mrr=0.6886574769631411 versus baseline 0.8147880873466811.",
+    "Throughput evidence from the completed bundle: EXP176 item-incoterms ran around 5.67 train steps/sec on two ranks with per-rank batch 2, i.e. about 22.7 effective train items/sec; final test progress was around 6.86 it/sec with val/test batch effectively 1. EXP174 user-churn finished with final test progress around 12.81 it/sec. The bundle failure is therefore scientific, not a practical-throughput failure.",
+    "Interpretation: the Poly-encoder scorer remained Stage4-compatible and computationally scalable, but the salt-side score surface still landed near the repeated 0.678576 collapse band rather than in the retune-plausible 0.75-ish region. Do not hand-scan autocomplete_poly_codes; treat this implementation path as failed unless a new paper- or ablation-backed mechanism changes the information path."
+  ],
+  "task_launches": {
+    "user-ltv": {
+      "target": "lab25211",
+      "gpu": [
+        5,
+        6
+      ],
+      "window_name": "stage3-exp175",
+      "baseline_default_gpu": 6,
+      "per_rank_batch_size": 1,
+      "launch_world_size": 2,
+      "launch_mode": "packed_batch_equivalent",
+      "launch_wave": 0
+    },
+    "user-churn": {
+      "target": "lab25211",
+      "gpu": 5,
+      "window_name": "stage3-exp174",
+      "baseline_default_gpu": 5,
+      "per_rank_batch_size": 4,
+      "launch_world_size": 1,
+      "launch_mode": "packed_batch_equivalent",
+      "launch_wave": 1
+    },
+    "item-incoterms": {
+      "target": "lab25211",
+      "gpu": [
+        6,
+        7
+      ],
+      "window_name": "stage3-exp176",
+      "baseline_default_gpu": 7,
+      "per_rank_batch_size": 2,
+      "launch_world_size": 2,
+      "launch_mode": "packed_batch_equivalent",
+      "launch_wave": 1
+    }
+  }
+}

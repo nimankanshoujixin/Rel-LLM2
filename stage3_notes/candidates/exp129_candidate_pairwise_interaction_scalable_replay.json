@@ -1,0 +1,96 @@
+{
+  "bundle_id": "BUNDLE-129",
+  "slug": "candidate_pairwise_interaction_scalable_replay",
+  "title": "Candidate pairwise interaction scalable replay",
+  "family": "label_interface",
+  "source_type": "ablation",
+  "launch_mode": "serial_batch_equivalent",
+  "status": "stopped",
+  "task_run_ids": {
+    "user-churn": "EXP129",
+    "user-ltv": "EXP130",
+    "item-incoterms": "EXP131"
+  },
+  "literature": {
+    "queries": [
+      "candidate conditioned pairwise scoring replay scalable autocomplete multiclass graph llm",
+      "candidate aware multiclass scorer pairwise interaction scalable ranking interface relbench"
+    ],
+    "papers": [
+      {
+        "title": "",
+        "url": "",
+        "claim": "",
+        "relevance": "",
+        "status": "not_required_for_ablation"
+      }
+    ]
+  },
+  "evidence": {
+    "prior_experiments": [
+      "EXP093",
+      "EXP099",
+      "EXP123",
+      "EXP126"
+    ],
+    "why_now": "EXP126 showed that even after removing the training-time OOM path, the top-k dual autoregressive reranker still delivers unacceptable throughput while staying below the strict item-incoterms baseline. EXP093 already established that cheap candidate-conditioned pairwise interaction carries real salt-side signal, and EXP099 showed that the stronger autoregressive hybrid can help but at a scalability cost. The next justified step is therefore a clean replay of the cheaper pairwise-only interface under the new scalability and throughput constraints."
+  },
+  "hypothesis": "If the robust part of the autocomplete gain comes from candidate-conditioned pairwise interaction rather than from expensive autoregressive token reranking, then replaying the pairwise-only scorer should recover a meaningful fraction of the salt-side signal while restoring practical throughput and preserving a cleaner Stage 4 pretrain-compatible candidate-scoring story.",
+  "common_overrides": {
+    "autocomplete_decision_interface": "candidate_pairwise_interaction"
+  },
+  "task_overrides": {
+    "user-churn": {},
+    "user-ltv": {},
+    "item-incoterms": {}
+  },
+  "notes": [
+    "Keep Stage 3 finetune-only; do not introduce pretrain, loss-family changes, sampling changes, or packaging changes.",
+    "This is a replay-control style return to the cheaper candidate-conditioned pairwise scorer after the top-k autoregressive reranker line proved too slow to justify continued screening.",
+    "Use the new serial_batch_equivalent launch mode so the active representative task can absorb the idle GPU pool without silently changing effective global batch.",
+    "Launched on 2026-05-09 through the local Stage 3 launcher.",
+    "Resolved serial batch-equivalent placement at launch time: user-churn -> lab25211 GPUs 5,6 with per-rank batch 2; user-ltv -> lab25211 GPUs 5,6 with per-rank batch 1; item-incoterms -> lab25211 GPUs 5,6 with per-rank batch 2.",
+    "First orchestrator status check after launch showed the serial controller active and the first representative-task window up; later tasks remained queued behind the serial controller as expected for launch_mode=serial_batch_equivalent.",
+    "Completed on 2026-05-09 with global verdict: failed.",
+    "user-churn improved strongly, user-ltv landed in the noise band, and item-incoterms regressed far below baseline even under the replay-aware effective delta.",
+    "Conclusion: pure pairwise candidate-conditioned interaction restores practical throughput but loses too much salt-side multiclass ranking signal to remain the active endpoint."
+  ],
+  "task_launches": {
+    "user-churn": {
+      "target": "lab25211",
+      "gpu": [
+        5,
+        6
+      ],
+      "window_name": "stage3-exp129",
+      "baseline_default_gpu": 5,
+      "per_rank_batch_size": 2,
+      "launch_world_size": 2,
+      "launch_mode": "serial_batch_equivalent"
+    },
+    "user-ltv": {
+      "target": "lab25211",
+      "gpu": [
+        5,
+        6
+      ],
+      "window_name": "stage3-exp130",
+      "baseline_default_gpu": 6,
+      "per_rank_batch_size": 1,
+      "launch_world_size": 2,
+      "launch_mode": "serial_batch_equivalent"
+    },
+    "item-incoterms": {
+      "target": "lab25211",
+      "gpu": [
+        5,
+        6
+      ],
+      "window_name": "stage3-exp131",
+      "baseline_default_gpu": 7,
+      "per_rank_batch_size": 2,
+      "launch_world_size": 2,
+      "launch_mode": "serial_batch_equivalent"
+    }
+  }
+}

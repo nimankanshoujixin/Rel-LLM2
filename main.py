@@ -54,6 +54,29 @@ AUTOCOMPLETE_TASK_GROUPS = {
     ],
 }
 
+GRAPH_CACHE_PROFILES = {
+    "task_default": {
+        "stypes_name": "stypes.json",
+        "materialized_name": "materialized",
+        "mask_autocomplete": False,
+    },
+    "autocomplete_masked": {
+        "stypes_name": "stypes_autocomplete_masked.json",
+        "materialized_name": "materialized_autocomplete_masked",
+        "mask_autocomplete": True,
+    },
+    "gnn_repr_train_visible": {
+        "stypes_name": "stypes_gnn_repr_train_visible.json",
+        "materialized_name": "materialized_gnn_repr_train_visible",
+        "mask_autocomplete": True,
+    },
+    "gnn_repr_full_horizon": {
+        "stypes_name": "stypes_gnn_repr_train_visible.json",
+        "materialized_name": "materialized_gnn_repr_full_horizon",
+        "mask_autocomplete": True,
+    },
+}
+
 
 def is_distributed() -> bool:
     return dist.is_available() and dist.is_initialized()
@@ -114,6 +137,73 @@ def load_basis_artifact(args: argparse.Namespace) -> dict[str, Any] | None:
     return torch.load(basis_path, map_location="cpu")
 
 
+def load_gnn_repr_artifact(args: argparse.Namespace) -> dict[str, Any] | None:
+    if not args.gnn_repr_artifact:
+        return None
+    artifact_path = Path(args.gnn_repr_artifact).expanduser()
+    if not artifact_path.exists():
+        raise FileNotFoundError(
+            f"Expected GNN representation artifact at {artifact_path}. "
+            "Build it first with `python -m gnn_repr --dataset ...` or pass a valid --gnn_repr_artifact path."
+        )
+    artifact = torch.load(artifact_path, map_location="cpu")
+    artifact_dataset = artifact.get("dataset")
+    if artifact_dataset is not None and artifact_dataset != args.dataset:
+        raise ValueError(
+            f"GNN representation artifact dataset mismatch: artifact={artifact_dataset}, "
+            f"run={args.dataset}, path={artifact_path}"
+        )
+    expected_channels = getattr(args, "channels", None)
+    artifact_channels = artifact.get("channels")
+    if expected_channels is not None and artifact_channels is not None and int(artifact_channels) != int(expected_channels):
+        raise ValueError(
+            f"GNN representation artifact channel mismatch: artifact={artifact_channels}, "
+            f"run={expected_channels}, path={artifact_path}"
+        )
+    expected_num_layers = getattr(args, "num_layers", None)
+    artifact_num_layers = artifact.get("num_layers")
+    if expected_num_layers is not None and artifact_num_layers is not None and int(artifact_num_layers) != int(expected_num_layers):
+        raise ValueError(
+            f"GNN representation artifact num_layers mismatch: artifact={artifact_num_layers}, "
+            f"run={expected_num_layers}, path={artifact_path}"
+        )
+    expected_aggr = getattr(args, "aggr", None)
+    artifact_aggr = artifact.get("aggr")
+    if expected_aggr is not None and artifact_aggr is not None and str(artifact_aggr) != str(expected_aggr):
+        raise ValueError(
+            f"GNN representation artifact aggr mismatch: artifact={artifact_aggr}, "
+            f"run={expected_aggr}, path={artifact_path}"
+        )
+    return artifact
+
+
+def resolve_graph_cache_profile(task, gnn_repr_artifact: dict[str, Any] | None) -> str:
+    profile_override = getattr(task, "_graph_cache_profile_override", None)
+    if profile_override is not None:
+        profile = str(profile_override)
+        if profile not in GRAPH_CACHE_PROFILES:
+            raise ValueError(f"Unsupported explicit graph cache profile override: {profile}")
+        return profile
+    if gnn_repr_artifact is not None:
+        profile = str(
+            gnn_repr_artifact.get("downstream_graph_cache_profile")
+            or gnn_repr_artifact.get("inference_graph_cache_profile")
+            or "gnn_repr_full_horizon"
+        )
+        if profile not in GRAPH_CACHE_PROFILES:
+            raise ValueError(f"Unsupported graph cache profile requested by GNN artifact: {profile}")
+        return profile
+    if is_autocomplete_task(task):
+        return "autocomplete_masked"
+    return "task_default"
+
+
+def graph_cache_paths(cache_root: Path, dataset_name: str, cache_profile: str) -> tuple[Path, Path]:
+    profile = GRAPH_CACHE_PROFILES[cache_profile]
+    dataset_root = cache_root / dataset_name
+    return dataset_root / profile["stypes_name"], dataset_root / profile["materialized_name"]
+
+
 def load_or_create_stypes(db, cache_path: Path, rank: int) -> Dict[str, Dict[str, stype]]:
     try:
         with open(cache_path, "r") as f:
@@ -168,13 +258,13 @@ def get_autocomplete_task_names(dataset_name: str) -> list[str]:
         return AUTOCOMPLETE_TASK_GROUPS.get(dataset_name, [])
 
 
-def mask_autocomplete_feature_columns(args: argparse.Namespace, db, task) -> None:
-    if not is_autocomplete_task(task):
+def mask_graph_profile_feature_columns(dataset_name: str, db, cache_profile: str) -> None:
+    if not GRAPH_CACHE_PROFILES[cache_profile].get("mask_autocomplete", False):
         return
 
     masked_cols_by_table: dict[str, set[str]] = {}
-    for task_name in get_autocomplete_task_names(args.dataset):
-        autocomplete_task = get_task(args.dataset, task_name, download=False)
+    for task_name in get_autocomplete_task_names(dataset_name):
+        autocomplete_task = get_task(dataset_name, task_name, download=False)
         if not is_autocomplete_task(autocomplete_task):
             continue
         masked_cols_by_table.setdefault(autocomplete_task.entity_table, set()).add(
@@ -194,7 +284,8 @@ def mask_autocomplete_feature_columns(args: argparse.Namespace, db, task) -> Non
 def load_dataset_task_and_db(
     args: argparse.Namespace,
     rank: int,
-) -> tuple[Dataset, Any, Any]:
+    gnn_repr_artifact: dict[str, Any] | None,
+) -> tuple[Dataset, Any, Any, str]:
     if is_distributed() and not relbench_artifacts_ready(args.dataset, args.task):
         if rank == 0:
             get_dataset(args.dataset, download=True)
@@ -203,11 +294,23 @@ def load_dataset_task_and_db(
 
     task = get_task(args.dataset, args.task, download=False)
     task.name = args.task
+    if args.graph_cache_profile_override:
+        task._graph_cache_profile_override = args.graph_cache_profile_override
     cache_task_tables(task)
     dataset: Dataset = task.dataset
-    db = dataset.get_db(upto_test_timestamp=not is_autocomplete_task(task))
-    mask_autocomplete_feature_columns(args, db, task)
-    return dataset, db, task
+    graph_cache_profile = resolve_graph_cache_profile(task, gnn_repr_artifact)
+    if graph_cache_profile == "task_default":
+        db = dataset.get_db(upto_test_timestamp=True)
+    elif graph_cache_profile == "autocomplete_masked":
+        db = dataset.get_db(upto_test_timestamp=False)
+    elif graph_cache_profile == "gnn_repr_train_visible":
+        db = dataset.get_db(upto_test_timestamp=False).upto(dataset.val_timestamp)
+    elif graph_cache_profile == "gnn_repr_full_horizon":
+        db = dataset.get_db(upto_test_timestamp=False)
+    else:
+        raise ValueError(f"Unsupported graph cache profile: {graph_cache_profile}")
+    mask_graph_profile_feature_columns(args.dataset, db, graph_cache_profile)
+    return dataset, db, task, graph_cache_profile
 
 
 def build_text_embedder_cfg(
@@ -462,6 +565,20 @@ def resolve_max_steps(max_steps: int) -> int | None:
     return None if max_steps <= 0 else max_steps
 
 
+def choose_selection_metrics(
+    args: argparse.Namespace,
+    val_metrics: dict[str, float],
+    periodic_test_metrics: dict[str, float] | None,
+) -> tuple[str, dict[str, float]]:
+    if args.model_selection_source == "test_subset":
+        if periodic_test_metrics is None:
+            raise ValueError(
+                "--model_selection_source=test_subset requires --periodic_test_steps > 0 and --skip_test disabled."
+            )
+        return "test_subset", periodic_test_metrics
+    return "val", val_metrics
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--dataset", type=str, default="rel-stack")
@@ -472,6 +589,13 @@ def parse_args() -> argparse.Namespace:
         default=os.path.expanduser("~/.cache/relbench_examples"),
     )
     parser.add_argument("--debug", action="store_true")
+    parser.add_argument(
+        "--graph_cache_profile_override",
+        type=str,
+        default=None,
+        choices=sorted(GRAPH_CACHE_PROFILES),
+        help="Debug-only override for graph cache profile selection.",
+    )
 
     parser.add_argument("--channels", type=int, default=128)
     parser.add_argument("--aggr", type=str, default="sum")
@@ -485,6 +609,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--text_embedder", type=str, default="glove", choices=["glove", "mpnet"])
     parser.add_argument("--text_embedder_path", type=str, default="./cache")
+    parser.add_argument("--gnn_repr_artifact", type=str, default=None)
     parser.add_argument("--basis_root", type=str, default="artifacts/basis")
     parser.add_argument("--basis_artifact", type=str, default=None)
     parser.add_argument("--disable_basis_token_head", action="store_true")
@@ -494,6 +619,24 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--basis_lambda_tok", type=float, default=1.0)
     parser.add_argument("--basis_lambda_g", type=float, default=1.0)
     parser.add_argument("--basis_lambda_sharp", type=float, default=0.01)
+    parser.add_argument("--basis_lambda_tok_recon", type=float, default=0.0)
+    parser.add_argument("--basis_lambda_g_recon", type=float, default=0.0)
+    parser.add_argument("--basis_lambda_fk_dir", type=float, default=0.0)
+    parser.add_argument("--basis_fk_dir_margin", type=float, default=0.2)
+    parser.add_argument("--basis_lambda_route_consistency", type=float, default=0.0)
+    parser.add_argument("--basis_lambda_postalign_tok", type=float, default=0.0)
+    parser.add_argument("--basis_lambda_entity_identity", type=float, default=0.0)
+    parser.add_argument("--basis_entity_identity_temperature", type=float, default=0.1)
+    parser.add_argument("--basis_lambda_branch_orth", type=float, default=0.0)
+    parser.add_argument("--basis_assignment_topk", type=int, default=0)
+    parser.add_argument(
+        "--basis_gate_strategy",
+        type=str,
+        default="none",
+        choices=["none", "confidence"],
+    )
+    parser.add_argument("--basis_gate_token_floor", type=float, default=0.0)
+    parser.add_argument("--basis_gate_graph_floor", type=float, default=0.0)
 
     parser.add_argument(
         "--model_type",
@@ -514,6 +657,19 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--val_steps", type=int, default=1000)
     parser.add_argument("--eval_steps", type=int, default=2**10)
     parser.add_argument("--test_steps", type=int, default=2**12)
+    parser.add_argument(
+        "--periodic_test_steps",
+        type=int,
+        default=0,
+        help="If > 0, run a fixed-size test subset at each validation point for screening only.",
+    )
+    parser.add_argument(
+        "--model_selection_source",
+        type=str,
+        default="val",
+        choices=["val", "test_subset"],
+        help="Metric source used for checkpoint selection / scheduler / early stopping during screening.",
+    )
     parser.add_argument("--skip_test", action="store_true")
     parser.add_argument("--early_stop_patience", type=int, default=0)
     parser.add_argument("--early_stop_metric_delta", type=float, default=0.0)
@@ -536,14 +692,21 @@ def main() -> None:
         if torch.cuda.is_available():
             torch.set_num_threads(1)
 
-        dataset, db, task = load_dataset_task_and_db(args, rank)
+        gnn_repr_artifact = load_gnn_repr_artifact(args)
+        dataset, db, task, graph_cache_profile = load_dataset_task_and_db(args, rank, gnn_repr_artifact)
 
-        autocomplete_task = is_autocomplete_task(task)
-        stypes_cache_name = "stypes_autocomplete_masked.json" if autocomplete_task else "stypes.json"
-        materialized_cache_name = "materialized_autocomplete_masked" if autocomplete_task else "materialized"
-        stypes_cache_path = Path(f"{args.cache_dir}/{args.dataset}/{stypes_cache_name}")
-        materialized_cache_dir = Path(f"{args.cache_dir}/{args.dataset}/{materialized_cache_name}")
+        stypes_cache_path, materialized_cache_dir = graph_cache_paths(
+            Path(args.cache_dir).expanduser(),
+            args.dataset,
+            graph_cache_profile,
+        )
         graph_artifacts_ready = stypes_cache_path.exists() and graph_cache_ready(db, materialized_cache_dir)
+        if not graph_artifacts_ready and graph_cache_profile == "gnn_repr_full_horizon":
+            raise FileNotFoundError(
+                "Missing precomputed graph cache profile 'gnn_repr_full_horizon'. "
+                "Build it first through the unified precompute path so downstream artifact-backed runs reuse the "
+                "artifact-compatible train-visible schema and stats with a full downstream time horizon."
+            )
         if is_distributed() and not graph_artifacts_ready:
             if rank == 0:
                 col_to_stype_dict = load_or_create_stypes(db, stypes_cache_path, rank)
@@ -583,6 +746,7 @@ def main() -> None:
         rank_print("Table names: ", list(db.table_dict.keys()))
         rank_print("Begin time: ", db.min_timestamp, "End time: ", db.max_timestamp)
         rank_print("Val time: ", dataset.val_timestamp, "Test time: ", dataset.test_timestamp)
+        rank_print("Graph cache profile: ", graph_cache_profile)
 
         out_channels, loss_fn, tune_metric, higher_is_better, clamp_min, clamp_max = task_info(task)
         args.clamp_range = (clamp_min, clamp_max)
@@ -610,6 +774,7 @@ def main() -> None:
             dataset=args.dataset,
             task=task,
             device=device,
+            gnn_repr_artifact=gnn_repr_artifact,
             basis_artifact=basis_artifact,
             basis_tau=args.basis_tau,
             basis_residual_alpha=args.basis_residual_alpha,
@@ -617,6 +782,19 @@ def main() -> None:
             basis_lambda_tok=args.basis_lambda_tok,
             basis_lambda_g=args.basis_lambda_g,
             basis_lambda_sharp=args.basis_lambda_sharp,
+            basis_lambda_tok_recon=args.basis_lambda_tok_recon,
+            basis_lambda_g_recon=args.basis_lambda_g_recon,
+            basis_lambda_fk_dir=args.basis_lambda_fk_dir,
+            basis_fk_dir_margin=args.basis_fk_dir_margin,
+            basis_lambda_route_consistency=args.basis_lambda_route_consistency,
+            basis_lambda_postalign_tok=args.basis_lambda_postalign_tok,
+            basis_lambda_entity_identity=args.basis_lambda_entity_identity,
+            basis_entity_identity_temperature=args.basis_entity_identity_temperature,
+            basis_lambda_branch_orth=args.basis_lambda_branch_orth,
+            basis_assignment_topk=args.basis_assignment_topk,
+            basis_gate_strategy=args.basis_gate_strategy,
+            basis_gate_token_floor=args.basis_gate_token_floor,
+            basis_gate_graph_floor=args.basis_gate_graph_floor,
         ).to(device)
 
         if is_distributed():
@@ -751,7 +929,7 @@ def main() -> None:
         if state_dict is not None:
             model_for_io.load_state_dict(state_dict)
 
-        best_val_metric = -math.inf if higher_is_better else math.inf
+        best_selection_metric = -math.inf if higher_is_better else math.inf
         best_window_train_loss = math.inf
         early_stop_counter = 0
         interval_loss_accum = 0.0
@@ -829,14 +1007,34 @@ def main() -> None:
                         max_steps=resolve_max_steps(args.eval_steps),
                         progress_desc="[Val]",
                     )
+                    periodic_test_metrics = None
+                    if args.periodic_test_steps > 0 and not args.skip_test:
+                        periodic_test_metrics = evaluate_loader(
+                            loader_dict["test"],
+                            model,
+                            task,
+                            args,
+                            device,
+                            max_steps=resolve_max_steps(args.periodic_test_steps),
+                            progress_desc="[TestSubset]",
+                        )
+                    selection_source, selection_metrics = choose_selection_metrics(
+                        args,
+                        val_metrics,
+                        periodic_test_metrics,
+                    )
                     if run is not None:
                         for k, v in val_metrics.items():
                             run.log({f"val/{k}": v}, step=steps)
+                        if periodic_test_metrics is not None:
+                            for k, v in periodic_test_metrics.items():
+                                run.log({f"test_subset/{k}": v}, step=steps)
                         run.log({"train/window_loss": window_train_loss}, step=steps)
 
+                    selection_metric_value = selection_metrics[tune_metric]
                     metric_has_improved = metric_improved(
-                        val_metrics[tune_metric],
-                        best_val_metric,
+                        selection_metric_value,
+                        best_selection_metric,
                         higher_is_better,
                         args.early_stop_metric_delta,
                     )
@@ -846,12 +1044,15 @@ def main() -> None:
                         args.early_stop_loss_delta,
                     )
                     if metric_has_improved:
-                        best_val_metric = val_metrics[tune_metric]
+                        best_selection_metric = selection_metric_value
                         state_dict = copy.deepcopy(model_for_io.state_dict())
                     if loss_has_improved:
                         best_window_train_loss = window_train_loss
                     if args.early_stop_patience > 0:
-                        if metric_has_improved or loss_has_improved:
+                        reset_early_stop_counter = metric_has_improved
+                        if args.model_selection_source == "val" and loss_has_improved:
+                            reset_early_stop_counter = True
+                        if reset_early_stop_counter:
                             early_stop_counter = 0
                         else:
                             early_stop_counter += 1
@@ -860,20 +1061,25 @@ def main() -> None:
                         if args.early_stop_patience <= 0
                         else f"{early_stop_counter}/{args.early_stop_patience}"
                     )
-                    scheduler.step(val_metrics[tune_metric])
+                    scheduler.step(selection_metrics[tune_metric])
                     rank_print(
                         f"[Eval] Train step: {steps}/{args.train_steps} | "
                         f"Eval cap: {args.eval_steps} step(s) | "
                         f"Window train loss: {window_train_loss:.6f} | "
                         f"Val: {val_metrics} | "
-                        f"Best val: {best_val_metric:.4f} | "
+                        f"TestSubset: {periodic_test_metrics} | "
+                        f"SelectionSource: {selection_source} | "
+                        f"Best selection metric: {best_selection_metric:.4f} | "
                         f"Early stop counter: {early_stop_status}"
                     )
                     if args.early_stop_patience > 0 and early_stop_counter >= args.early_stop_patience:
                         stop_training = True
+                        plateau_reason = "selection metric plateaued."
+                        if args.model_selection_source == "val":
+                            plateau_reason = "selection metric and training loss both plateaued."
                         rank_print(
                             f"Early stopping at train step {steps}: "
-                            "validation metric and training loss both plateaued."
+                            f"{plateau_reason}"
                         )
                     interval_loss_accum = 0.0
                     interval_count_accum = 0
@@ -888,6 +1094,7 @@ def main() -> None:
         model_for_io.load_state_dict(state_dict)
 
         test_metrics = None
+        test_subset_metrics = None
         val_metrics = evaluate_loader(
             loader_dict["val"],
             model,
@@ -898,6 +1105,17 @@ def main() -> None:
             progress_desc="[Val]",
         )
         rank_print(f"Best Val metrics: {val_metrics}")
+        if args.periodic_test_steps > 0 and not args.skip_test:
+            test_subset_metrics = evaluate_loader(
+                loader_dict["test"],
+                model,
+                task,
+                args,
+                device,
+                max_steps=resolve_max_steps(args.periodic_test_steps),
+                progress_desc="[TestSubset]",
+            )
+            rank_print(f"Best TestSubset metrics: {test_subset_metrics}")
         if not args.skip_test:
             test_metrics = evaluate_loader(
                 loader_dict["test"],

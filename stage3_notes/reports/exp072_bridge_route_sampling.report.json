@@ -1,0 +1,59 @@
+{
+  "candidate": "stage3_notes\\candidates\\exp072_bridge_route_sampling.json",
+  "tasks": {
+    "user-churn": {
+      "run_id": "EXP072",
+      "log_path": "G:\\RelLLM-2\\Rel-LLM\\stage3_notes\\reports\\log_cache\\stage3-exp072.log",
+      "metrics": {
+        "average_precision": 0.621444439359319,
+        "accuracy": 0.611328125,
+        "f1": 0.7587878787878788,
+        "roc_auc": 0.5316839790004335
+      },
+      "comparison": {
+        "primary_metric": "roc_auc",
+        "current": 0.5316839790004335,
+        "baseline": 0.6540209032382359,
+        "signed_gain": -0.1223369242378024,
+        "delta_threshold": 0.001,
+        "verdict": "worse"
+      }
+    },
+    "user-ltv": {
+      "run_id": "EXP073",
+      "log_path": "G:\\RelLLM-2\\Rel-LLM\\stage3_notes\\reports\\log_cache\\stage3-exp073.log",
+      "metrics": {
+        "r2": -0.6047400848155526,
+        "mae": 98.5119142881874,
+        "rmse": 160.47495991708772
+      },
+      "comparison": {
+        "primary_metric": "mae",
+        "current": 98.5119142881874,
+        "baseline": 79.27257269903086,
+        "signed_gain": -19.23934158915654,
+        "delta_threshold": 0.001,
+        "verdict": "worse"
+      }
+    },
+    "item-incoterms": {
+      "run_id": "EXP074",
+      "log_path": "G:\\RelLLM-2\\Rel-LLM\\stage3_notes\\reports\\log_cache\\stage3-exp074.log",
+      "metrics": {
+        "accuracy": 0.71875,
+        "macro_f1": 0.14975581642248312,
+        "micro_f1": 0.71875,
+        "mrr": 0.8027554422573954
+      },
+      "comparison": {
+        "primary_metric": "mrr",
+        "current": 0.8027554422573954,
+        "baseline": 0.8147880873466811,
+        "signed_gain": -0.012032645089285698,
+        "delta_threshold": 0.001,
+        "verdict": "worse"
+      }
+    }
+  },
+  "global_verdict": "failed"
+}

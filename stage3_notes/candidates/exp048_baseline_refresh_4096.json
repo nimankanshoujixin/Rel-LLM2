@@ -1,0 +1,42 @@
+{
+  "bundle_id": "BUNDLE-048",
+  "slug": "baseline_refresh_4096",
+  "title": "4096-step screening baseline refresh",
+  "family": "baseline_refresh",
+  "source_type": "ablation",
+  "status": "stopped",
+  "task_run_ids": {
+    "user-churn": "EXP048",
+    "user-ltv": "EXP049",
+    "item-incoterms": "EXP050"
+  },
+  "literature": {
+    "queries": [
+      "stage3 screening baseline refresh test subset variance 4096",
+      "test subset selection variance baseline rerun graph llm"
+    ],
+    "papers": []
+  },
+  "evidence": {
+    "prior_experiments": [
+      "EXP010",
+      "EXP012",
+      "EXP014"
+    ],
+    "why_now": "The Stage 3 screening protocol was widened from 128 to 4096 evaluation/test-subset steps. The old strict baselines are therefore no longer protocol-matched and must be rerun before further candidate comparison."
+  },
+  "hypothesis": "No model change. Rerunning the current Stage 2 merged line under the new 4096-step screening protocol should provide lower-variance strict baselines for subsequent Stage 3 candidate judgment.",
+  "common_overrides": {},
+  "task_overrides": {
+    "user-churn": {},
+    "user-ltv": {},
+    "item-incoterms": {}
+  },
+  "notes": [
+    "This bundle is for protocol refresh only.",
+    "Do not judge it against the old 128-step strict baselines.",
+    "Use its final subset-test metrics to replace screening_baseline_metrics in baseline_registry.json.",
+    "Cancelled on 2026-05-05 after the protocol was revised from 4096 to 512 for better tuning efficiency.",
+    "Do not use these partial 4096-step logs as the new strict baseline."
+  ]
+}

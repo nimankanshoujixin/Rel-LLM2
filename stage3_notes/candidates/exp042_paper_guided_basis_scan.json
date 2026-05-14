@@ -1,0 +1,83 @@
+{
+  "bundle_id": "BUNDLE-042",
+  "slug": "paper_guided_basis_scan",
+  "title": "Paper-guided graph-alignment rebalance",
+  "family": "basis_injection",
+  "source_type": "paper+ablation",
+  "status": "stopped",
+  "task_run_ids": {
+    "user-churn": "EXP042",
+    "user-ltv": "EXP043",
+    "item-incoterms": "EXP044"
+  },
+  "literature": {
+    "queries": [
+      "graph soft prompt alignment residual supervision modality mismatch graph llm",
+      "graph reconstructive alignment supervision soft prompt graph residual mixing llm"
+    ],
+    "papers": [
+      {
+        "title": "Can we Soft Prompt LLMs for Graph Learning Tasks?",
+        "url": "https://arxiv.org/abs/2402.10359",
+        "claim": "The key bottleneck is graph-text modality mismatch, so prompt quality depends on alignment quality rather than prompt token decoration alone.",
+        "relevance": "Supports shifting Stage 3 effort from prompt-order tinkering toward better basis-query and projector-side alignment.",
+        "status": "selected"
+      },
+      {
+        "title": "G-Retriever: Retrieval-Augmented Generation for Graph Question Answering",
+        "url": "https://arxiv.org/abs/2402.07630",
+        "claim": "A single compressed graph prompt can lose structural fidelity, so aggressive prompt-side graph injection can become a bottleneck.",
+        "relevance": "Supports reducing direct graph residual strength instead of increasing prompt-side graph mixing.",
+        "status": "selected"
+      },
+      {
+        "title": "Toward Graph-Tokenizing Large Language Models with Reconstructive Graph Instruction Tuning",
+        "url": "https://arxiv.org/abs/2603.01385",
+        "claim": "Stronger graph reconstruction-style supervision improves graph-token alignment beyond text-only objectives.",
+        "relevance": "Supports increasing graph-side basis supervision while keeping the basis channel active at inference.",
+        "status": "selected"
+      }
+    ]
+  },
+  "evidence": {
+    "prior_experiments": [
+      "EXP033",
+      "EXP034",
+      "EXP035",
+      "EXP036",
+      "EXP037",
+      "EXP038",
+      "EXP039",
+      "EXP040",
+      "EXP041"
+    ],
+    "why_now": "No-basis and basis-loss-only ablations showed the basis path is necessary, while token-only basis showed that removing graph residual entirely helps user-ltv but harms user-churn. The next paper-backed step is therefore not another binary ablation but a rebalance: weaken direct graph residual injection while strengthening graph-side alignment supervision."
+  },
+  "hypothesis": "The current basis path likely mixes graph-level residuals into prompt space too aggressively relative to how well the graph query is aligned. A better cross-task compromise is to keep token basis residuals unchanged, reduce graph residual strength to about half of the current baseline level, and simultaneously strengthen graph-side alignment supervision with a slightly sharper basis query temperature.",
+  "common_overrides": {},
+  "task_overrides": {
+    "user-churn": {
+      "basis_tau": 0.052566118646896765,
+      "basis_graph_alpha": 0.08427776321511331,
+      "basis_lambda_g": 4.342471280063852
+    },
+    "user-ltv": {
+      "basis_tau": 0.07290253383636455,
+      "basis_graph_alpha": 0.04069435840926393,
+      "basis_lambda_g": 0.316969617924498
+    },
+    "item-incoterms": {
+      "basis_tau": 0.03433605128818772,
+      "basis_graph_alpha": 0.10220436109161611,
+      "basis_lambda_g": 0.87674141125569
+    }
+  },
+  "notes": [
+    "Systematic rule for this first paper-guided scan point: keep basis_residual_alpha unchanged, halve basis_graph_alpha, multiply basis_lambda_g by 1.5, and scale basis_tau to 0.85x the strict-baseline value for each representative task.",
+    "This candidate is intentionally limited to graph-alignment rebalance; it does not change prompt ordering, projector LayerNorm, or disable any basis component.",
+    "Representative-task gate remains strict: any primary-metric regression kills the bundle.",
+    "Launched on 2026-05-05 after fixing stage3_research.py wrapper generation to emit LF line endings and underscore-style CLI flags.",
+    "Stopped on 2026-05-05 after orchestrator early-kill recommendation: user-churn regressed on the primary screening metric.",
+    "Final report verdict: failed. user-ltv improved, item-incoterms was neutral, but the bundle is globally non-promotable."
+  ]
+}

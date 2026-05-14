@@ -1,0 +1,67 @@
+{
+  "bundle_id": "BUNDLE-108",
+  "slug": "scalable_shared_prefix_hybrid_scorer",
+  "title": "Scalable shared-prefix hybrid scorer",
+  "family": "label_interface",
+  "source_type": "ablation",
+  "status": "failed",
+  "task_run_ids": {
+    "user-churn": "EXP108",
+    "user-ltv": "EXP109",
+    "item-incoterms": "EXP110"
+  },
+  "literature": {
+    "queries": [
+      "candidate aware multiclass scorer scalable shared prefix autoregressive rollout replay confirmed hybrid signal",
+      "autocomplete multiclass shared prefix candidate token scoring pairwise interaction non exhaustive stage3 redesign"
+    ],
+    "papers": []
+  },
+  "evidence": {
+    "prior_experiments": [
+      "EXP093",
+      "EXP096",
+      "EXP099",
+      "EXP105"
+    ],
+    "why_now": "EXP093 established that candidate-conditioned interaction carries real signal, and EXP096 plus EXP099 established that adding candidate-token autoregressive signal creates the first replay-confirmed representative-task bundle. EXP105 and the architecture review then retired the current exhaustive hybrid head because it is not the acceptable long-term scalable path."
+  },
+  "hypothesis": "Keep the replay-confirmed hybrid family but replace exhaustive per-candidate autoregressive rollout with a shared-prefix candidate lattice over class-id token sequences. Pairwise candidate interaction stays as the candidate-aware signal, while prefix-shared decoding preserves candidate-token evidence with non-multiplicative scaling in prompt length and class count.",
+  "common_overrides": {
+    "autocomplete_decision_interface": "candidate_pairwise_shared_prefix_hybrid"
+  },
+  "task_overrides": {
+    "user-churn": {},
+    "user-ltv": {},
+    "item-incoterms": {}
+  },
+  "notes": [
+    "This candidate is finetune-only and uses the standard three-task Stage 3 subset bundle.",
+    "The design goal is to keep the replay-confirmed hybrid signal while replacing exhaustive per-candidate decoding with shared-prefix scoring.",
+    "Launched on 2026-05-08 through the local Stage 3 launcher.",
+    "Resolved idle-GPU placement at launch time: user-churn -> lab25211 GPU 0, user-ltv -> lab25211 GPU 5, item-incoterms -> lab25211 GPU 6.",
+    "First orchestrator status check after launch showed all three windows up and logs in DB-load startup.",
+    "Completed on 2026-05-08 with global verdict: failed.",
+    "Outcome: user-churn improved clearly, item-incoterms was only neutral within the strict delta threshold, and user-ltv regressed below the strict baseline."
+  ],
+  "task_launches": {
+    "user-churn": {
+      "target": "lab25211",
+      "gpu": 0,
+      "window_name": "stage3-exp108",
+      "baseline_default_gpu": 5
+    },
+    "user-ltv": {
+      "target": "lab25211",
+      "gpu": 5,
+      "window_name": "stage3-exp109",
+      "baseline_default_gpu": 6
+    },
+    "item-incoterms": {
+      "target": "lab25211",
+      "gpu": 6,
+      "window_name": "stage3-exp110",
+      "baseline_default_gpu": 7
+    }
+  }
+}

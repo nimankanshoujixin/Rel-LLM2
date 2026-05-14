@@ -1,0 +1,66 @@
+{
+  "candidate": "stage3_notes\\candidates\\exp162_autocomplete_hard_negative_rank_auxiliary.json",
+  "manual_report": true,
+  "manual_reason": "stage3_orchestrator finalization could not run because EXP162 has no evaluation lines after a pre-eval SIGTERM.",
+  "tasks": {
+    "user-churn": {
+      "run_id": "EXP162",
+      "log_path": "G:\\RelLLM-2\\Rel-LLM\\stage3_notes\\reports\\log_cache\\stage3-exp162.log",
+      "status": "abnormal_pre_eval_sigterm",
+      "metrics": null,
+      "comparison": {
+        "primary_metric": "roc_auc",
+        "baseline": 0.6540209032382359,
+        "effective_delta_threshold": 0.002552699600237518,
+        "verdict": "missing"
+      },
+      "failure_signature": {
+        "target": "lab25211",
+        "gpu": [0, 5],
+        "local_rank": 0,
+        "exitcode": -15,
+        "message": "Signal 15 (SIGTERM) received before first evaluation"
+      }
+    },
+    "user-ltv": {
+      "run_id": "EXP163",
+      "log_path": "G:\\RelLLM-2\\Rel-LLM\\stage3_notes\\reports\\log_cache\\stage3-exp163.log",
+      "metrics": {
+        "r2": -0.07930135265570515,
+        "mae": 76.62298232233618,
+        "rmse": 146.66593143117672
+      },
+      "comparison": {
+        "primary_metric": "mae",
+        "current": 76.62298232233618,
+        "baseline": 79.27257269903086,
+        "signed_gain": 2.649590376694678,
+        "delta_threshold": 0.001,
+        "noise_floor_delta": 6.511244718243262,
+        "effective_delta_threshold": 6.511244718243262,
+        "verdict": "neutral"
+      }
+    },
+    "item-incoterms": {
+      "run_id": "EXP164",
+      "log_path": "G:\\RelLLM-2\\Rel-LLM\\stage3_notes\\reports\\log_cache\\stage3-exp164.log",
+      "metrics": {
+        "accuracy": 0.6494140625,
+        "macro_f1": 0.13224845986908887,
+        "micro_f1": 0.6494140625,
+        "mrr": 0.7555898718252234
+      },
+      "comparison": {
+        "primary_metric": "mrr",
+        "current": 0.7555898718252234,
+        "baseline": 0.8147880873466811,
+        "signed_gain": -0.0591982155214577,
+        "delta_threshold": 0.001,
+        "noise_floor_delta": 0.013037038915945098,
+        "effective_delta_threshold": 0.013037038915945098,
+        "verdict": "worse"
+      }
+    }
+  },
+  "global_verdict": "failed"
+}

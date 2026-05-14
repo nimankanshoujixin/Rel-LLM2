@@ -1,0 +1,70 @@
+{
+  "bundle_id": "BUNDLE-060",
+  "slug": "paper_guided_alignment_recon_loss",
+  "title": "Paper-guided stronger alignment and reconstruction loss",
+  "family": "alignment_supervision",
+  "source_type": "paper+ablation",
+  "status": "stopped",
+  "task_run_ids": {
+    "user-churn": "EXP060",
+    "user-ltv": "EXP061",
+    "item-incoterms": "EXP062"
+  },
+  "literature": {
+    "queries": [
+      "reconstructive graph instruction tuning graph token alignment loss llm",
+      "graph-aware language model alignment supervision reconstruction auxiliary loss"
+    ],
+    "papers": [
+      {
+        "title": "Toward Graph-Tokenizing Large Language Models with Reconstructive Graph Instruction Tuning",
+        "url": "https://arxiv.org/abs/2603.01385",
+        "claim": "Explicit reconstruction-style graph supervision improves graph-token alignment beyond text-only objectives.",
+        "relevance": "Directly motivates adding a stronger auxiliary graph alignment / reconstruction loss instead of only retuning basis mixing coefficients.",
+        "status": "selected"
+      },
+      {
+        "title": "Graph-Aware Language Model Pre-Training on a Large Graph Corpus Can Help Multiple Graph Applications",
+        "url": "https://arxiv.org/abs/2306.02592",
+        "claim": "Graph-aware pretraining and auxiliary graph-text objectives can improve downstream transfer across multiple graph tasks.",
+        "relevance": "Supports moving upstream toward representation supervision rather than another prompt-side scan.",
+        "status": "selected"
+      },
+      {
+        "title": "Can we Soft Prompt LLMs for Graph Learning Tasks?",
+        "url": "https://arxiv.org/abs/2402.10359",
+        "claim": "Alignment quality is the key bottleneck in graph soft prompting.",
+        "relevance": "Supports treating alignment loss design as the next central variable.",
+        "status": "selected"
+      }
+    ]
+  },
+  "evidence": {
+    "prior_experiments": [
+      "EXP042",
+      "EXP045",
+      "EXP054",
+      "EXP057"
+    ],
+    "why_now": "Basis-side, retrieval-side, and pretrain-warmup routes have all failed to deliver a non-regressive bundle. The pretrain warmup path is additionally blocked by an implementation issue, so the next productive slot is an explicit code-backed alignment/reconstruction loss change."
+  },
+  "hypothesis": "The existing basis losses are too weak and too indirect to stabilize the graph-text interface across tasks. Adding a stronger auxiliary alignment/reconstruction objective to the current fine-tuning path should be more promising than continuing to tune basis coefficients or relying on the broken pretrain warmup path.",
+  "common_overrides": {
+    "basis_lambda_tok_recon": 0.15,
+    "basis_lambda_g_recon": 0.3
+  },
+  "task_overrides": {
+    "user-churn": {},
+    "user-ltv": {},
+    "item-incoterms": {}
+  },
+  "notes": [
+    "This candidate requires code changes before render/launch.",
+    "Intended scope: extend the current basis alignment path with a stronger explicit reconstruction or latent-alignment objective.",
+    "This is a finetune-only candidate; do not use pretrain.",
+    "Implementation is now available through new basis_lambda_tok_recon and basis_lambda_g_recon CLI knobs.",
+    "Launched on 2026-05-06 under the refreshed 512-step strict baseline.",
+    "Completed on 2026-05-06 with global verdict: failed.",
+    "user-churn improved, but user-ltv and item-incoterms both regressed against the refreshed 512-step strict baselines."
+  ]
+}

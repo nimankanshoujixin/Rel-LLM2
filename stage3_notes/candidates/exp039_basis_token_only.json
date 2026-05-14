@@ -1,0 +1,42 @@
+{
+  "bundle_id": "BUNDLE-039",
+  "slug": "basis_token_only",
+  "title": "Keep token basis residual, remove graph residual",
+  "family": "basis_injection",
+  "source_type": "ablation",
+  "status": "stopped",
+  "task_run_ids": {
+    "user-churn": "EXP039",
+    "user-ltv": "EXP040",
+    "item-incoterms": "EXP041"
+  },
+  "literature": {
+    "queries": [
+      "token-level residual alignment graph prompting llm tabular reasoning",
+      "graph-level prompt residual ablation basis alignment language model"
+    ],
+    "papers": []
+  },
+  "evidence": {
+    "prior_experiments": [
+      "EXP036",
+      "EXP037",
+      "EXP038"
+    ],
+    "why_now": "Basis-loss-only failed, so the next narrower hypothesis is that only graph-level basis residuals are harmful while token residuals may still help."
+  },
+  "hypothesis": "Removing only graph-level basis residual injection may recover cross-task stability while preserving token-level basis guidance.",
+  "common_overrides": {
+    "basis_graph_alpha": 0.0
+  },
+  "task_overrides": {
+    "user-churn": {},
+    "user-ltv": {},
+    "item-incoterms": {}
+  },
+  "notes": [
+    "Completed and judged on 2026-05-05.",
+    "Global verdict: failed.",
+    "user-ltv improved, item-incoterms was neutral, but user-churn regressed below the strict screening baseline."
+  ]
+}

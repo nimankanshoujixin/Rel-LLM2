@@ -1,0 +1,113 @@
+{
+  "bundle_id": "BUNDLE-156",
+  "slug": "candidate_pairwise_query_conditioned_token_stats_mlp_projectionfix_rerun",
+  "title": "Candidate pairwise query-conditioned token stats MLP projection-fix rerun",
+  "family": "label_interface",
+  "source_type": "ablation",
+  "launch_mode": "serial_batch_equivalent",
+  "status": "failed",
+  "serial_target": "lab25211",
+  "task_gpus": {
+    "user-churn": [
+      5,
+      6
+    ],
+    "user-ltv": [
+      5,
+      6
+    ],
+    "item-incoterms": [
+      5,
+      6
+    ]
+  },
+  "task_run_ids": {
+    "user-churn": "EXP156",
+    "user-ltv": "EXP157",
+    "item-incoterms": "EXP158"
+  },
+  "literature": {
+    "queries": [
+      "learned token statistics scorer candidate ranking non autoregressive multiclass",
+      "query conditioned token interaction MLP scorer scalable candidate ranking"
+    ],
+    "papers": [
+      {
+        "title": "",
+        "url": "",
+        "claim": "",
+        "relevance": "",
+        "status": "not_required_for_ablation"
+      }
+    ]
+  },
+  "evidence": {
+    "prior_experiments": [
+      "EXP150",
+      "EXP153",
+      "EXP154",
+      "EXP155"
+    ],
+    "why_now": "EXP153/154/155 was the first learned token-stats MLP bundle, but EXP155 failed before the first evaluation because the MLP interface was not included in the projection-initialization guard. EXP153 was clearly better on user-churn and EXP154 was neutral under the wide user-ltv replay-aware effective delta, so the family still needs one clean salt-side rerun before scientific judgment."
+  },
+  "hypothesis": "If the learned token-statistics scorer is the correct scalable follow-up to the fixed residual in EXP150, then fixing the missing query/key projection initialization should let the bundle produce a clean item-incoterms result while preserving the same finetune-only, non-autoregressive, Stage 4-compatible candidate-aware scorer.",
+  "common_overrides": {
+    "autocomplete_decision_interface": "candidate_pairwise_query_conditioned_token_stats_mlp"
+  },
+  "task_overrides": {
+    "user-churn": {},
+    "user-ltv": {},
+    "item-incoterms": {}
+  },
+  "notes": [
+    "Keep Stage 3 finetune-only; do not introduce pretrain, loss-family changes, sampling changes, or packaging changes.",
+    "No scientific change relative to EXP153/154/155; fix only the missing query/key projection initialization for the token-stats MLP scorer.",
+    "Use serial_batch_equivalent scheduling with explicit safe GPU 5,6 placement for all three representative tasks.",
+    "EXP155 is implementation-blocked rather than scientific evidence because item-incoterms failed before the first evaluation with ValueError: Query-conditioned token stats require query/key projections.",
+    "Launched on 2026-05-09 through the local Stage 3 launcher.",
+    "Fresh current-thread heartbeat automation created: monitor-stage-3-exp156-bundle.",
+    "Completed cleanly on 2026-05-09 with global verdict: failed.",
+    "Result under replay-aware effective deltas: user-churn better, user-ltv neutral, item-incoterms worse.",
+    "Because this interface only changes autocomplete multiclass behavior, the Amazon-side movement should be treated mainly as no-op rerun drift/control evidence rather than as causal support for the scorer.",
+    "The decisive item-incoterms result stayed in the same failed plateau as EXP138, EXP141, and EXP150: mrr=0.6785764663938492 versus strict baseline 0.8147880873466811.",
+    "Conclusion: learned weighting of the current token-stat feature set is not enough; do not launch another near-duplicate fixed-pooled-label or token-stat weighting variant."
+  ],
+  "task_launches": {
+    "user-churn": {
+      "target": "lab25211",
+      "gpu": [
+        5,
+        6
+      ],
+      "window_name": "stage3-exp156",
+      "baseline_default_gpu": 5,
+      "per_rank_batch_size": 2,
+      "launch_world_size": 2,
+      "launch_mode": "serial_batch_equivalent"
+    },
+    "user-ltv": {
+      "target": "lab25211",
+      "gpu": [
+        5,
+        6
+      ],
+      "window_name": "stage3-exp157",
+      "baseline_default_gpu": 6,
+      "per_rank_batch_size": 1,
+      "launch_world_size": 2,
+      "launch_mode": "serial_batch_equivalent"
+    },
+    "item-incoterms": {
+      "target": "lab25211",
+      "gpu": [
+        5,
+        6
+      ],
+      "window_name": "stage3-exp158",
+      "baseline_default_gpu": 7,
+      "per_rank_batch_size": 2,
+      "launch_world_size": 2,
+      "launch_mode": "serial_batch_equivalent"
+    }
+  }
+}

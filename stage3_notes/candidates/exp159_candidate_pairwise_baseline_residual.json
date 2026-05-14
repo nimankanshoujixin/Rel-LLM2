@@ -1,0 +1,105 @@
+{
+  "bundle_id": "BUNDLE-159",
+  "slug": "candidate_pairwise_baseline_residual",
+  "title": "Candidate pairwise baseline-anchored residual scorer",
+  "family": "label_interface",
+  "source_type": "ablation",
+  "launch_mode": "packed_batch_equivalent",
+  "status": "failed",
+  "packed_target": "lab25211",
+  "task_cost_weights": {
+    "user-churn": 1.0,
+    "user-ltv": 1.2,
+    "item-incoterms": 2.5
+  },
+  "task_run_ids": {
+    "user-churn": "EXP159",
+    "user-ltv": "EXP160",
+    "item-incoterms": "EXP161"
+  },
+  "literature": {
+    "queries": [
+      "residual learning initialize residual branch to zero ranking model",
+      "learning to rank residual scorer preserve baseline candidate scoring"
+    ],
+    "papers": [
+      {
+        "title": "",
+        "url": "",
+        "claim": "",
+        "relevance": "",
+        "status": "not_required_for_ablation"
+      }
+    ]
+  },
+  "evidence": {
+    "prior_experiments": [
+      "EXP108",
+      "EXP129",
+      "EXP141",
+      "EXP150",
+      "EXP156"
+    ],
+    "why_now": "EXP108 preserved the salt-side autocomplete ranking signal near the strict baseline, while the later non-autoregressive scorer-replacement line repeatedly collapsed item-incoterms to the same MRR plateau. EXP129, EXP141, EXP150, and EXP156 all improved or moved Amazon-side controls but regressed item-incoterms, so the next justified mechanism is not another stronger replacement head; it is a baseline-preserving residual that can use candidate-aware interaction only as a small correction."
+  },
+  "hypothesis": "If the failed scalable pairwise and token-stat families are damaging the already-useful autocomplete baseline by replacing the score surface, then anchoring the multiclass decision to the raw-label baseline scorer and adding only a zero-initialized, tanh-bounded candidate-aware residual should preserve salt-side MRR while still allowing real candidate interaction to help when it is robust. This remains finetune-only, non-autoregressive, candidate-aware, and Stage 4-compatible because the scorer is O(C) after one prompt encoding and does not use exhaustive candidate rollout.",
+  "common_overrides": {
+    "autocomplete_decision_interface": "candidate_pairwise_baseline_residual",
+    "autocomplete_residual_scale": 0.1
+  },
+  "task_overrides": {
+    "user-churn": {},
+    "user-ltv": {},
+    "item-incoterms": {}
+  },
+  "notes": [
+    "Keep Stage 3 finetune-only; do not introduce pretrain, loss-family changes, sampling changes, or packaging changes.",
+    "This candidate intentionally preserves the raw-label baseline scorer as the primary multiclass decision surface and tests only a small candidate-aware residual.",
+    "The residual scorer is zero-initialized in the final affine layer, so the first optimization step starts from the baseline scoring behavior rather than a replacement head.",
+    "Use packed_batch_equivalent scheduling to improve GPU utilization while preserving effective global batch size for each representative task.",
+    "This is not another fixed pooled-label or token-stat weighting tweak; it changes the failure handling strategy from scorer replacement to baseline-anchored residual learning.",
+    "Completed cleanly on 2026-05-09 with global verdict: failed.",
+    "Result under replay-aware effective deltas: user-churn better, user-ltv neutral, item-incoterms worse.",
+    "item-incoterms did avoid the exact repeated 0.6785764663938492 plateau, landing at mrr=0.6990761110634157, but it remained far below the strict baseline mrr=0.8147880873466811 and outside the effective delta threshold.",
+    "Conclusion: anchoring to the raw-label baseline scorer partially softened the scorer-replacement collapse but did not preserve the baseline score surface enough to keep the salt-side task neutral.",
+    "Do not manually increase autocomplete_residual_scale as a next step; treat pairwise residuals over the current feature path as exhausted unless a new paper- or ablation-backed mechanism changes the information path."
+  ],
+  "task_launches": {
+    "user-churn": {
+      "target": "lab25211",
+      "gpu": [
+        5,
+        6
+      ],
+      "window_name": "stage3-exp159",
+      "baseline_default_gpu": 5,
+      "per_rank_batch_size": 2,
+      "launch_world_size": 2,
+      "launch_mode": "packed_batch_equivalent",
+      "launch_wave": 0
+    },
+    "user-ltv": {
+      "target": "lab25211",
+      "gpu": 5,
+      "window_name": "stage3-exp160",
+      "baseline_default_gpu": 6,
+      "per_rank_batch_size": 2,
+      "launch_world_size": 1,
+      "launch_mode": "packed_batch_equivalent",
+      "launch_wave": 1
+    },
+    "item-incoterms": {
+      "target": "lab25211",
+      "gpu": [
+        6,
+        7
+      ],
+      "window_name": "stage3-exp161",
+      "baseline_default_gpu": 7,
+      "per_rank_batch_size": 2,
+      "launch_world_size": 2,
+      "launch_mode": "packed_batch_equivalent",
+      "launch_wave": 1
+    }
+  }
+}

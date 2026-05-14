@@ -1,0 +1,65 @@
+{
+  "candidate": "stage3_notes\\candidates\\exp150_candidate_pairwise_query_conditioned_token_stats_safegpu_rerun.json",
+  "tasks": {
+    "user-churn": {
+      "run_id": "EXP150",
+      "log_path": "G:\\RelLLM-2\\Rel-LLM\\stage3_notes\\reports\\log_cache\\stage3-exp150.log",
+      "metrics": {
+        "average_precision": 0.6936289516988936,
+        "accuracy": 0.6455078125,
+        "f1": 0.7555555555555555,
+        "roc_auc": 0.6825633150060766
+      },
+      "comparison": {
+        "primary_metric": "roc_auc",
+        "current": 0.6825633150060766,
+        "baseline": 0.6540209032382359,
+        "signed_gain": 0.02854241176784067,
+        "delta_threshold": 0.001,
+        "noise_floor_delta": 0.002552699600237518,
+        "effective_delta_threshold": 0.002552699600237518,
+        "verdict": "better"
+      }
+    },
+    "user-ltv": {
+      "run_id": "EXP151",
+      "log_path": "G:\\RelLLM-2\\Rel-LLM\\stage3_notes\\reports\\log_cache\\stage3-exp151.log",
+      "metrics": {
+        "r2": -0.059709514497534366,
+        "mae": 76.46346467481314,
+        "rmse": 145.32867058315142
+      },
+      "comparison": {
+        "primary_metric": "mae",
+        "current": 76.46346467481314,
+        "baseline": 79.27257269903086,
+        "signed_gain": 2.8091080242177213,
+        "delta_threshold": 0.001,
+        "noise_floor_delta": 6.511244718243262,
+        "effective_delta_threshold": 6.511244718243262,
+        "verdict": "neutral"
+      }
+    },
+    "item-incoterms": {
+      "run_id": "EXP152",
+      "log_path": "G:\\RelLLM-2\\Rel-LLM\\stage3_notes\\reports\\log_cache\\stage3-exp152.log",
+      "metrics": {
+        "accuracy": 0.560546875,
+        "macro_f1": 0.0718397997496871,
+        "micro_f1": 0.560546875,
+        "mrr": 0.6785764663938492
+      },
+      "comparison": {
+        "primary_metric": "mrr",
+        "current": 0.6785764663938492,
+        "baseline": 0.8147880873466811,
+        "signed_gain": -0.1362116209528319,
+        "delta_threshold": 0.001,
+        "noise_floor_delta": 0.013037038915945098,
+        "effective_delta_threshold": 0.013037038915945098,
+        "verdict": "worse"
+      }
+    }
+  },
+  "global_verdict": "failed"
+}

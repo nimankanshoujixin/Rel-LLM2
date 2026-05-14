@@ -1,0 +1,97 @@
+{
+  "bundle_id": "BUNDLE-135",
+  "slug": "candidate_pairwise_positional_interaction_rerun",
+  "title": "Candidate pairwise positional interaction rerun",
+  "family": "label_interface",
+  "source_type": "ablation",
+  "launch_mode": "serial_batch_equivalent",
+  "status": "implementation-blocked",
+  "task_run_ids": {
+    "user-churn": "EXP135",
+    "user-ltv": "EXP136",
+    "item-incoterms": "EXP137"
+  },
+  "literature": {
+    "queries": [
+      "label token order pooling candidate pairwise scorer scalable multiclass graph llm",
+      "cheap token sequence label encoder pairwise ranking multiclass candidate aware scorer"
+    ],
+    "papers": [
+      {
+        "title": "",
+        "url": "",
+        "claim": "",
+        "relevance": "",
+        "status": "not_required_for_ablation"
+      }
+    ]
+  },
+  "evidence": {
+    "prior_experiments": [
+      "EXP099",
+      "EXP126",
+      "EXP129",
+      "EXP132"
+    ],
+    "why_now": "EXP132 was implementation-blocked before item-incoterms could be evaluated because the new positional label pooler used Tanh without importing it. The underlying hypothesis is still justified by EXP129 and EXP126, so the next correct action is a clean rerun with no scientific change."
+  },
+  "hypothesis": "If the main weakness of the fast pairwise scorer is that its label representations throw away token order by mean-pooling candidate tokens, then replacing that mean pool with a tiny position-aware attention pool should recover part of the candidate-token signal while keeping the scorer in the scalable non-autoregressive regime.",
+  "common_overrides": {
+    "autocomplete_decision_interface": "candidate_pairwise_positional_interaction"
+  },
+  "task_overrides": {
+    "user-churn": {},
+    "user-ltv": {},
+    "item-incoterms": {}
+  },
+  "notes": [
+    "Keep Stage 3 finetune-only; do not introduce pretrain, loss-family changes, sampling changes, or packaging changes.",
+    "This is a clean rerun of EXP132 after fixing a missing Tanh import in the new positional label pooler.",
+    "No scientific change relative to EXP132; the rerun exists only to recover the intended salt-side evidence.",
+    "Use serial_batch_equivalent scheduling by default.",
+    "Launched on 2026-05-09 through the local Stage 3 launcher.",
+    "Resolved serial batch-equivalent placement at launch time: user-churn -> lab25211 GPUs 5,6 with per-rank batch 2; user-ltv -> lab25211 GPUs 5,6 with per-rank batch 1; item-incoterms -> lab25211 GPUs 5,6 with per-rank batch 2.",
+    "First orchestrator status check after launch showed the serial controller active and the first representative-task window up in DB-load startup; later tasks remained queued behind the controller as expected.",
+    "Completed on 2026-05-09 as implementation-blocked rather than scientifically failed.",
+    "EXP135 and EXP136 both ran to completion, but EXP137 crashed before the first evaluation because candidate_pairwise_positional_interaction was still routed through the top-k dual hybrid branch in forward and therefore called candidate_fusion_gate even though that module is intentionally absent for this family.",
+    "Do not use EXP135 as scientific evidence against the positional-interaction family; rerun cleanly after the forward-routing fix."
+  ],
+  "task_launches": {
+    "user-churn": {
+      "target": "lab25211",
+      "gpu": [
+        5,
+        6
+      ],
+      "window_name": "stage3-exp135",
+      "baseline_default_gpu": 5,
+      "per_rank_batch_size": 2,
+      "launch_world_size": 2,
+      "launch_mode": "serial_batch_equivalent"
+    },
+    "user-ltv": {
+      "target": "lab25211",
+      "gpu": [
+        5,
+        6
+      ],
+      "window_name": "stage3-exp136",
+      "baseline_default_gpu": 6,
+      "per_rank_batch_size": 1,
+      "launch_world_size": 2,
+      "launch_mode": "serial_batch_equivalent"
+    },
+    "item-incoterms": {
+      "target": "lab25211",
+      "gpu": [
+        5,
+        6
+      ],
+      "window_name": "stage3-exp137",
+      "baseline_default_gpu": 7,
+      "per_rank_batch_size": 2,
+      "launch_world_size": 2,
+      "launch_mode": "serial_batch_equivalent"
+    }
+  }
+}

@@ -1,0 +1,70 @@
+{
+  "bundle_id": "BUNDLE-090",
+  "slug": "partial_win_replay_control",
+  "title": "Partial-win replay control",
+  "family": "control_protocol",
+  "source_type": "ablation",
+  "status": "stopped",
+  "task_run_ids": {
+    "user-churn": "EXP090",
+    "user-ltv": "EXP091",
+    "item-incoterms": "EXP092"
+  },
+  "literature": {
+    "queries": [
+      "ml partial win replay control rerun protocol variance candidate confirmation",
+      "deep learning candidate replay reproducibility structured experiment control"
+    ],
+    "papers": [
+      {
+        "title": "N/A",
+        "url": "",
+        "claim": "This is a control protocol candidate rather than a literature-derived modeling idea.",
+        "relevance": "Used to test whether a recent partial-win bundle survives rerun variance once the baseline noise floor is known.",
+        "status": "selected"
+      }
+    ]
+  },
+  "evidence": {
+    "prior_experiments": [
+      "EXP078",
+      "EXP081",
+      "EXP087"
+    ],
+    "why_now": "EXP087 showed that the unchanged refreshed baseline can still produce a strong user-ltv regression and an item-incoterms MRR drop almost identical to EXP078. That makes EXP078 the right next replay target: it was the strongest recent partial win, and its apparent salt-side failure may be partially confounded by baseline rerun variance."
+  },
+  "hypothesis": "Replaying the EXP078 split local/global graph-token packaging bundle under the same protocol will show whether its Amazon-side gains and salt-side regression are stable relative to the baseline rerun spread revealed by EXP087. This is a confirmation control, not a new modeling idea.",
+  "common_overrides": {
+    "prompt_split_global_local": true
+  },
+  "task_overrides": {
+    "user-churn": {},
+    "user-ltv": {},
+    "item-incoterms": {}
+  },
+  "notes": [
+    "Control only. Do not launch until the baseline noise-floor control has been summarized.",
+    "This bundle replays EXP078 exactly at the modeling level: split local/global graph-token packaging only.",
+    "Interpretation target: decide whether EXP078's user-ltv gain and item-incoterms regression are outside the baseline rerun spread."
+  ],
+  "task_launches": {
+    "user-churn": {
+      "target": "lab25211",
+      "gpu": 0,
+      "window_name": "stage3-exp090",
+      "baseline_default_gpu": 5
+    },
+    "user-ltv": {
+      "target": "lab25211",
+      "gpu": 5,
+      "window_name": "stage3-exp091",
+      "baseline_default_gpu": 6
+    },
+    "item-incoterms": {
+      "target": "lab25211",
+      "gpu": 6,
+      "window_name": "stage3-exp092",
+      "baseline_default_gpu": 7
+    }
+  }
+}

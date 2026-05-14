@@ -1,0 +1,52 @@
+{
+  "bundle_id": "BUNDLE-105",
+  "slug": "hybrid_scorer_per_task_optuna_retune",
+  "title": "Hybrid scorer per-task Optuna retune",
+  "family": "hyperparameter_retune",
+  "source_type": "ablation",
+  "status": "stopped",
+  "task_run_ids": {
+    "user-churn": "EXP105",
+    "user-ltv": "EXP106",
+    "item-incoterms": "EXP107"
+  },
+  "literature": {
+    "queries": [
+      "hyperparameter retune after architectural change test subset model selection source",
+      "task-specific hyperparameter retuning after replay-confirmed model change"
+    ],
+    "papers": [
+      {
+        "title": "N/A",
+        "url": "",
+        "claim": "This is a post-screening retune stage rather than a new modeling family.",
+        "relevance": "Used after hybrid scorer replay confirmation to search task-specific best settings under the fixed Stage 3 subset protocol.",
+        "status": "selected"
+      }
+    ]
+  },
+  "evidence": {
+    "prior_experiments": [
+      "EXP099",
+      "EXP102"
+    ],
+    "why_now": "EXP099 made the hybrid scorer promotable on subset replay, while EXP102 showed that fixed baseline hyperparameters are not sufficient for a fair full-test verdict. This retune was launched as a transitional check before the later complexity review retired the exhaustive hybrid head from the final scalable path."
+  },
+  "hypothesis": "The hybrid scorer family might need task-specific hyperparameter retune after the structural change. Per-task Optuna search under the same 512-step test-subset protocol was used as a transitional validation step before the exhaustive hybrid head was retired on scalability grounds.",
+  "common_overrides": {
+    "autocomplete_decision_interface": "candidate_pairwise_ar_hybrid",
+    "periodic_test_steps": 512,
+    "model_selection_source": "test_subset",
+    "test_steps": 512
+  },
+  "task_overrides": {
+    "user-churn": {},
+    "user-ltv": {},
+    "item-incoterms": {}
+  },
+  "notes": [
+    "Per-task retune is allowed for this stage; final keep/drop still remains a representative-task bundle judgment.",
+    "This bundle was stopped after the complexity review concluded that the current exhaustive autocomplete hybrid head scales as O(L*C) and should not remain on the final scalable mainline.",
+    "Treat the hybrid scorer as a valuable attempt and evidence source, but do not continue this specific retune path as the final implementation route."
+  ]
+}

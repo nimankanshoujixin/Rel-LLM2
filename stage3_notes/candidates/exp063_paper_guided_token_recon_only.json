@@ -1,0 +1,67 @@
+{
+  "bundle_id": "BUNDLE-063",
+  "slug": "paper_guided_token_recon_only",
+  "title": "Paper-guided token-level reconstruction only",
+  "family": "alignment_supervision",
+  "source_type": "paper+ablation",
+  "status": "stopped",
+  "task_run_ids": {
+    "user-churn": "EXP063",
+    "user-ltv": "EXP064",
+    "item-incoterms": "EXP065"
+  },
+  "literature": {
+    "queries": [
+      "graph token alignment local reconstruction supervision soft prompt llm",
+      "reconstructive graph instruction tuning token-level alignment graph-level compression"
+    ],
+    "papers": [
+      {
+        "title": "Toward Graph-Tokenizing Large Language Models with Reconstructive Graph Instruction Tuning",
+        "url": "https://arxiv.org/abs/2603.01385",
+        "claim": "Stronger graph-token alignment supervision is useful, but it need not force a single global reconstruction bottleneck for every downstream behavior.",
+        "relevance": "Supports keeping explicit local reconstruction pressure while relaxing the more brittle graph-level path.",
+        "status": "selected"
+      },
+      {
+        "title": "Can we Soft Prompt LLMs for Graph Learning Tasks?",
+        "url": "https://arxiv.org/abs/2402.10359",
+        "claim": "The bottleneck is graph-text alignment quality, especially where graph content is converted into prompt tokens.",
+        "relevance": "Supports concentrating the next candidate on token-level alignment rather than stronger global graph compression.",
+        "status": "selected"
+      },
+      {
+        "title": "Graph-Aware Language Model Pre-Training on a Large Graph Corpus Can Help Multiple Graph Applications",
+        "url": "https://arxiv.org/abs/2306.02592",
+        "claim": "Graph-aware supervision can help transfer, but the useful signal may depend on how local or global the auxiliary objective is.",
+        "relevance": "Supports a narrower supervision target after the broader graph-level reconstruction bundle regressed two representative tasks.",
+        "status": "selected"
+      }
+    ]
+  },
+  "evidence": {
+    "prior_experiments": [
+      "EXP054",
+      "EXP060"
+    ],
+    "why_now": "EXP060 showed that stronger reconstruction supervision can materially help user-churn, but the added graph-level reconstruction term appears to overconstrain user-ltv and item-incoterms. The next paper-backed step is therefore to keep token-level reconstruction only."
+  },
+  "hypothesis": "Token-level reconstruction pressure may provide the useful local alignment signal without the cross-task regressions caused by graph-level reconstruction. Removing graph reconstruction while keeping token reconstruction is the cleanest next finetune-only test.",
+  "common_overrides": {
+    "basis_lambda_tok_recon": 0.15,
+    "basis_lambda_g_recon": 0.0
+  },
+  "task_overrides": {
+    "user-churn": {},
+    "user-ltv": {},
+    "item-incoterms": {}
+  },
+  "notes": [
+    "This is a finetune-only follow-up to EXP060.",
+    "Keep the refreshed 512-step screening protocol unchanged.",
+    "Only the graph reconstruction auxiliary term is removed; the token reconstruction term stays active.",
+    "Launched on 2026-05-06 against the refreshed 512-step strict baselines on GPUs 5/6/7.",
+    "Completed on 2026-05-07 with global verdict: failed.",
+    "user-churn improved, but user-ltv and item-incoterms both regressed against the refreshed 512-step strict baselines."
+  ]
+}

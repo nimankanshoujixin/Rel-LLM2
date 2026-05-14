@@ -1,0 +1,161 @@
+{
+  "candidate": "stage3_notes\\candidates\\exp192_gnn_repr_alignment_invariants.json",
+  "tasks": {
+    "user-churn": {
+      "run_id": "EXP192",
+      "log_path": "stage3_notes\\reports\\log_cache\\stage3-exp192.log",
+      "metrics": {
+        "average_precision": 0.6982382716223887,
+        "accuracy": 0.6494140625,
+        "f1": 0.7549488054607508,
+        "roc_auc": 0.6755841080409374
+      },
+      "comparison": {
+        "primary_metric": "roc_auc",
+        "current": 0.6755841080409374,
+        "baseline": 0.6540209032382359,
+        "signed_gain": 0.021563204802701463,
+        "delta_threshold": 0.001,
+        "noise_floor_delta": 0.002552699600237518,
+        "effective_delta_threshold": 0.002552699600237518,
+        "verdict": "better"
+      },
+      "screening_comparison": {
+        "primary_metric": "roc_auc",
+        "current": 0.6755841080409374,
+        "baseline": 0.6540209032382359,
+        "signed_gain": 0.021563204802701463,
+        "delta_threshold": 0.001,
+        "noise_floor_delta": 0.002552699600237518,
+        "effective_delta_threshold": 0.002552699600237518,
+        "verdict": "better"
+      },
+      "reference_comparison": {
+        "primary_metric": "roc_auc",
+        "current": 0.6755841080409374,
+        "baseline": 0.6918065868366201,
+        "signed_gain": -0.016222478795682727,
+        "verdict": "worse"
+      },
+      "advancement_assessment": {
+        "recommendation": "retune_plausible",
+        "reason": "screening already beats the fixed baseline and the full-test reference gap remains small enough to justify task-specific Optuna retune"
+      }
+    },
+    "user-ltv": {
+      "run_id": "EXP193",
+      "log_path": "stage3_notes\\reports\\log_cache\\stage3-exp193.log",
+      "metrics": {
+        "r2": -0.07490725267137277,
+        "mae": 75.17855171802512,
+        "rmse": 131.33800706499366
+      },
+      "comparison": {
+        "primary_metric": "mae",
+        "current": 75.17855171802512,
+        "baseline": 79.27257269903086,
+        "signed_gain": 4.094020981005741,
+        "delta_threshold": 0.001,
+        "noise_floor_delta": 6.511244718243262,
+        "effective_delta_threshold": 6.511244718243262,
+        "verdict": "neutral"
+      },
+      "screening_comparison": {
+        "primary_metric": "mae",
+        "current": 75.17855171802512,
+        "baseline": 79.27257269903086,
+        "signed_gain": 4.094020981005741,
+        "delta_threshold": 0.001,
+        "noise_floor_delta": 6.511244718243262,
+        "effective_delta_threshold": 6.511244718243262,
+        "verdict": "neutral"
+      },
+      "reference_comparison": {
+        "primary_metric": "mae",
+        "current": 75.17855171802512,
+        "baseline": 16.671180345060154,
+        "signed_gain": -58.50737137296497,
+        "verdict": "worse"
+      },
+      "advancement_assessment": {
+        "recommendation": "retune_plausible",
+        "reason": "for user-ltv the screen metric scale is a reliable task-local gate even though its absolute magnitude differs sharply from full test, so non-regression on screen remains worth Optuna plus final full-test confirmation"
+      }
+    },
+    "item-incoterms": {
+      "run_id": "EXP194",
+      "log_path": "stage3_notes\\reports\\log_cache\\stage3-exp194.log",
+      "metrics": {
+        "accuracy": 0.560546875,
+        "macro_f1": 0.0718397997496871,
+        "micro_f1": 0.560546875,
+        "mrr": 0.6760867685916514
+      },
+      "comparison": {
+        "primary_metric": "mrr",
+        "current": 0.6760867685916514,
+        "baseline": 0.8147880873466811,
+        "signed_gain": -0.13870131875502967,
+        "delta_threshold": 0.001,
+        "noise_floor_delta": 0.013037038915945098,
+        "effective_delta_threshold": 0.013037038915945098,
+        "verdict": "worse"
+      },
+      "screening_comparison": {
+        "primary_metric": "mrr",
+        "current": 0.6760867685916514,
+        "baseline": 0.8147880873466811,
+        "signed_gain": -0.13870131875502967,
+        "delta_threshold": 0.001,
+        "noise_floor_delta": 0.013037038915945098,
+        "effective_delta_threshold": 0.013037038915945098,
+        "verdict": "worse"
+      },
+      "reference_comparison": {
+        "primary_metric": "mrr",
+        "current": 0.6760867685916514,
+        "baseline": 0.7043105782857789,
+        "signed_gain": -0.028223809694127522,
+        "verdict": "worse"
+      },
+      "advancement_assessment": {
+        "recommendation": "retune_plausible",
+        "reason": "item-incoterms subset scores are too optimistic to use as the final scientific comparator, so a run that stays within the accepted full-test reference band remains worth Optuna retune"
+      }
+    }
+  },
+  "global_verdict": "failed",
+  "candidate_status": "retune_plausible",
+  "phase2_full_test_summary": {
+    "status": "completed",
+    "bundle_verdict": "mixed_confirmation",
+    "tasks": {
+      "user-churn": {
+        "study_name": "exp192_user_churn_optuna_20260513t2307",
+        "primary_metric": "roc_auc",
+        "full_test_metric": 0.6681287838379838,
+        "full_test_reference": 0.6918065868366201,
+        "signed_gain": -0.02367780299863631,
+        "verdict": "worse"
+      },
+      "user-ltv": {
+        "study_name": "exp193_user_ltv_optuna_20260514t141722",
+        "primary_metric": "mae",
+        "full_test_metric": 15.633182804023788,
+        "full_test_reference": 16.671180345060154,
+        "signed_gain": 1.0379975410363667,
+        "verdict": "better"
+      },
+      "item-incoterms": {
+        "study_name": "exp194_item_incoterms_optuna_20260513t2307",
+        "primary_metric": "mrr",
+        "full_test_metric": 0.7254209687717201,
+        "full_test_reference": 0.7043105782857789,
+        "signed_gain": 0.02111039048594121,
+        "verdict": "better"
+      }
+    },
+    "interpretation": "The EXP192 family now has two real full-test wins, including item-incoterms, but it is not yet a clean representative-set confirmation because user-churn stayed below the stored full-test reference.",
+    "next_action": "Persist the current implementation as a Part 1 validation-backed base state, then continue with Part 3 follow-up selection or implementation rather than rerunning the same Optuna or final-test-only wave."
+  }
+}

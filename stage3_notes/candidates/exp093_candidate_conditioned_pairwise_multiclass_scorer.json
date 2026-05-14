@@ -1,0 +1,88 @@
+{
+  "bundle_id": "BUNDLE-093",
+  "slug": "candidate_conditioned_pairwise_multiclass_scorer",
+  "title": "Candidate-conditioned pairwise multiclass scorer",
+  "family": "label_interface",
+  "source_type": "paper+ablation",
+  "status": "stopped",
+  "task_run_ids": {
+    "user-churn": "EXP093",
+    "user-ltv": "EXP094",
+    "item-incoterms": "EXP095"
+  },
+  "literature": {
+    "queries": [
+      "graph llm candidate conditioned scoring multiclass ranking pairwise interface autocomplete mrr",
+      "graph rag pairwise candidate interaction scorer structured classification interface"
+    ],
+    "papers": [
+      {
+        "title": "Graph Retrieval-Augmented Generation: A Survey",
+        "url": "https://arxiv.org/abs/2408.08921",
+        "claim": "Graph-enhanced generation quality depends on aligning retrieval, evidence organization, and downstream decision interfaces.",
+        "relevance": "Supports moving from a shallow label-view choice to a more explicit candidate-conditioned scoring interface.",
+        "status": "selected"
+      },
+      {
+        "title": "G-Retriever: Retrieval-Augmented Generation for Graph Question Answering",
+        "url": "https://arxiv.org/abs/2402.07630",
+        "claim": "Graph evidence must be consumed through an interface matched to the downstream decision problem.",
+        "relevance": "Supports introducing candidate-specific interactions between prompt evidence and candidate representations for autocomplete-style ranking.",
+        "status": "selected"
+      },
+      {
+        "title": "Can we Soft Prompt LLMs for Graph Learning Tasks?",
+        "url": "https://arxiv.org/abs/2402.10359",
+        "claim": "Prompt-side graph/task interface design can dominate gains once encoder-side modifications saturate.",
+        "relevance": "Supports a stronger scoring-interface redesign after class-id unification and static dual-view fusion both remained globally insufficient.",
+        "status": "selected"
+      }
+    ]
+  },
+  "evidence": {
+    "prior_experiments": [
+      "EXP081",
+      "EXP084",
+      "EXP087",
+      "EXP090"
+    ],
+    "why_now": "EXP081 showed that class-id label-interface unification is directionally helpful but too weak, while EXP084 showed that static dual-view fusion still leaves item-incoterms in the same regressive band. EXP087 and EXP090 also reduced the value of packaging-nearby reruns. The next justified step is therefore a candidate-conditioned scorer that lets the prompt representation interact with each candidate more explicitly."
+  },
+  "hypothesis": "The current scorer family is still too static: it compares one prompt-conditioned sample representation against mostly static candidate embeddings. For autocomplete multiclass tasks, adding candidate-conditioned interaction terms between the prompt representation and each candidate view should preserve salt-side ranking discrimination better than static verbalizer selection or a single shared dual-view fusion gate.",
+  "common_overrides": {
+    "autocomplete_decision_interface": "candidate_pairwise_interaction"
+  },
+  "task_overrides": {
+    "user-churn": {},
+    "user-ltv": {},
+    "item-incoterms": {}
+  },
+  "notes": [
+    "First implementation target: for autocomplete multiclass tasks only, compute candidate-specific interaction features from prompt x class-id view, prompt x raw-label view, and class-id/raw-label disagreement, then score each candidate with a lightweight pairwise scorer.",
+    "Do not mix new loss terms, sampling tweaks, or packaging changes into the first implementation.",
+    "Launched on 2026-05-07 through the local Stage 3 launcher.",
+    "First stable orchestrator status check shows all three windows up; user-churn and user-ltv completed DB load, while item-incoterms remained in early salt startup.",
+    "Completed on 2026-05-07 with global verdict: failed.",
+    "Outcome: user-ltv improved above the stored strict baseline and item-incoterms improved relative to recent candidate-aware runs, but user-churn regressed and salt still stayed below the strict MRR baseline."
+  ],
+  "task_launches": {
+    "user-churn": {
+      "target": "lab25211",
+      "gpu": 0,
+      "window_name": "stage3-exp093",
+      "baseline_default_gpu": 5
+    },
+    "user-ltv": {
+      "target": "lab25211",
+      "gpu": 5,
+      "window_name": "stage3-exp094",
+      "baseline_default_gpu": 6
+    },
+    "item-incoterms": {
+      "target": "lab25211",
+      "gpu": 6,
+      "window_name": "stage3-exp095",
+      "baseline_default_gpu": 7
+    }
+  }
+}

@@ -1,0 +1,99 @@
+{
+  "bundle_id": "BUNDLE-147",
+  "slug": "candidate_pairwise_query_conditioned_token_stats_rerun",
+  "title": "Candidate pairwise query-conditioned token stats rerun",
+  "family": "label_interface",
+  "source_type": "ablation",
+  "launch_mode": "serial_batch_equivalent",
+  "status": "implementation-blocked",
+  "task_run_ids": {
+    "user-churn": "EXP147",
+    "user-ltv": "EXP148",
+    "item-incoterms": "EXP149"
+  },
+  "literature": {
+    "queries": [
+      "token similarity statistics candidate scorer scalable multiclass ranking",
+      "query conditioned token interaction non autoregressive candidate ranking"
+    ],
+    "papers": [
+      {
+        "title": "",
+        "url": "",
+        "claim": "",
+        "relevance": "",
+        "status": "not_required_for_ablation"
+      }
+    ]
+  },
+  "evidence": {
+    "prior_experiments": [
+      "EXP099",
+      "EXP138",
+      "EXP141",
+      "EXP144"
+    ],
+    "why_now": "EXP144 was implementation-blocked / abnormal rather than scientifically resolved because the new token-stats path failed to initialize its query/key projections on item-incoterms and the first serial task was externally terminated before any evaluation. The token-stats hypothesis remains justified by EXP099, EXP138, and EXP141, so the correct next action is a clean rerun that consumes only the projection-init fix."
+  },
+  "hypothesis": "If the missing scalable signal is carried by token-level similarity peaks and spread rather than by a single pooled label vector, then augmenting the fast pairwise scorer with query-conditioned token-statistics residuals should recover part of the salt-side candidate-token benefit while staying in a non-autoregressive O(L + C*T) regime that remains plausible for Stage 4 pretraining.",
+  "common_overrides": {
+    "autocomplete_decision_interface": "candidate_pairwise_query_conditioned_token_stats"
+  },
+  "task_overrides": {
+    "user-churn": {},
+    "user-ltv": {},
+    "item-incoterms": {}
+  },
+  "notes": [
+    "Keep Stage 3 finetune-only; do not introduce pretrain, loss-family changes, sampling changes, or packaging changes.",
+    "This is a clean rerun of EXP144 after fixing the missing query/key projection initialization in the token-stats scorer.",
+    "No scientific change relative to EXP144; the rerun exists only to recover the intended evidence after the implementation fix.",
+    "Use serial_batch_equivalent scheduling by default.",
+    "Launched on 2026-05-09 through the local Stage 3 launcher.",
+    "Completed on 2026-05-09 as an abnormal-run rather than a clean scientific bundle.",
+    "EXP148 and EXP149 both produced usable metrics, but EXP147 was again externally terminated by SIGTERM before any evaluation while using the 4-GPU serial placement that included GPU 0.",
+    "Do not use EXP147 as scientific evidence against the token-stats family; rerun cleanly with an explicit safer serial GPU placement that avoids the unstable GPU 0 pattern."
+  ],
+  "task_launches": {
+    "user-churn": {
+      "target": "lab25211",
+      "gpu": [
+        0,
+        5,
+        6,
+        7
+      ],
+      "window_name": "stage3-exp147",
+      "baseline_default_gpu": 5,
+      "per_rank_batch_size": 1,
+      "launch_world_size": 4,
+      "launch_mode": "serial_batch_equivalent"
+    },
+    "user-ltv": {
+      "target": "lab25211",
+      "gpu": [
+        0,
+        5
+      ],
+      "window_name": "stage3-exp148",
+      "baseline_default_gpu": 6,
+      "per_rank_batch_size": 1,
+      "launch_world_size": 2,
+      "launch_mode": "serial_batch_equivalent"
+    },
+    "item-incoterms": {
+      "target": "lab25211",
+      "gpu": [
+        0,
+        5,
+        6,
+        7
+      ],
+      "window_name": "stage3-exp149",
+      "baseline_default_gpu": 7,
+      "per_rank_batch_size": 1,
+      "launch_world_size": 4,
+      "launch_mode": "serial_batch_equivalent"
+    }
+  }
+}

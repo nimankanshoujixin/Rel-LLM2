@@ -1,0 +1,47 @@
+{
+  "bundle_id": "BUNDLE-036",
+  "slug": "basis_loss_only",
+  "title": "Keep basis loss, remove direct basis prompt mixing",
+  "family": "basis_injection",
+  "source_type": "ablation",
+  "status": "stopped",
+  "task_run_ids": {
+    "user-churn": "EXP036",
+    "user-ltv": "EXP037",
+    "item-incoterms": "EXP038"
+  },
+  "literature": {
+    "queries": [
+      "retrieval-augmented prompting graph residual prompt mixing tabular llm",
+      "representation alignment residual prompt tuning graph llm tabular reasoning"
+    ],
+    "papers": []
+  },
+  "evidence": {
+    "prior_experiments": [
+      "EXP033",
+      "EXP034",
+      "EXP035"
+    ],
+    "why_now": "No-basis ablation failed broadly, so the next narrow ablation is to retain basis supervision but remove prompt-space residual mixing."
+  },
+  "hypothesis": "The harm may come from direct basis-driven prompt rewriting rather than from the basis supervision signal itself.",
+  "common_overrides": {
+    "basis_graph_alpha": 0.0
+  },
+  "task_overrides": {
+    "user-churn": {
+      "basis_residual_alpha": 0.0
+    },
+    "user-ltv": {
+      "basis_residual_alpha": 0.0
+    },
+    "item-incoterms": {
+      "basis_residual_alpha": 0.0
+    }
+  },
+  "notes": [
+    "This bundle is stored mainly as a parser/judge example.",
+    "Expected global verdict: failed."
+  ]
+}

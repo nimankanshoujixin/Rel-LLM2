@@ -1,0 +1,73 @@
+{
+  "bundle_id": "BUNDLE-099",
+  "slug": "hybrid_scorer_replay_control",
+  "title": "Hybrid scorer replay control",
+  "family": "control_protocol",
+  "source_type": "ablation",
+  "status": "promotable",
+  "task_run_ids": {
+    "user-churn": "EXP099",
+    "user-ltv": "EXP100",
+    "item-incoterms": "EXP101"
+  },
+  "literature": {
+    "queries": [
+      "ml replay control experiment candidate rerun variance confirmation hybrid scorer",
+      "deep learning rerun confirmation structured control promising candidate replay"
+    ],
+    "papers": [
+      {
+        "title": "N/A",
+        "url": "",
+        "claim": "This is a replay-control candidate rather than a literature-derived modeling idea.",
+        "relevance": "Used to determine whether the first simultaneous user-ltv and item-incoterms strict-baseline gains survive rerun variance.",
+        "status": "selected"
+      }
+    ]
+  },
+  "evidence": {
+    "prior_experiments": [
+      "EXP096",
+      "EXP087",
+      "EXP090"
+    ],
+    "why_now": "EXP096 is the first post-control architecture result to push both user-ltv and item-incoterms above their strict baselines at the same time. Because the implemented scorer change only affects autocomplete multiclass tasks, the user-churn regression needs replay confirmation before the family is rejected."
+  },
+  "hypothesis": "Replaying the pairwise + autoregressive hybrid scorer under the same protocol will show whether the simultaneous user-ltv and item-incoterms gains survive rerun variance and whether the user-churn regression was a no-op drift rather than a stable global failure.",
+  "common_overrides": {
+    "autocomplete_decision_interface": "candidate_pairwise_ar_hybrid"
+  },
+  "task_overrides": {
+    "user-churn": {},
+    "user-ltv": {},
+    "item-incoterms": {}
+  },
+  "notes": [
+    "Control only. This is an exact replay of EXP096 at the modeling level.",
+    "Do not mix new loss terms, sampling tweaks, or packaging changes into this replay.",
+    "Launched on 2026-05-07 through the local Stage 3 launcher.",
+    "First stable orchestrator status check shows all three windows up; user-churn and user-ltv are in Amazon DB-load startup while item-incoterms is in early salt startup.",
+    "Completed on 2026-05-07 with global verdict: promotable.",
+    "Outcome: replay survived on all three representative tasks, with user-churn, user-ltv, and item-incoterms all above their stored strict baselines."
+  ],
+  "task_launches": {
+    "user-churn": {
+      "target": "lab25211",
+      "gpu": 0,
+      "window_name": "stage3-exp099",
+      "baseline_default_gpu": 5
+    },
+    "user-ltv": {
+      "target": "lab25211",
+      "gpu": 5,
+      "window_name": "stage3-exp100",
+      "baseline_default_gpu": 6
+    },
+    "item-incoterms": {
+      "target": "lab25211",
+      "gpu": 6,
+      "window_name": "stage3-exp101",
+      "baseline_default_gpu": 7
+    }
+  }
+}

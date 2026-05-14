@@ -1,0 +1,67 @@
+{
+  "bundle_id": "BUNDLE-087",
+  "slug": "baseline_noise_floor_control",
+  "title": "Baseline noise-floor control",
+  "family": "control_protocol",
+  "source_type": "ablation",
+  "status": "stopped",
+  "task_run_ids": {
+    "user-churn": "EXP087",
+    "user-ltv": "EXP088",
+    "item-incoterms": "EXP089"
+  },
+  "literature": {
+    "queries": [
+      "ml experiment noise floor control rerun protocol single seed variance",
+      "deep learning reproducibility control rerun noise floor screening variance"
+    ],
+    "papers": [
+      {
+        "title": "N/A",
+        "url": "",
+        "claim": "This is a control protocol candidate rather than a literature-derived modeling idea.",
+        "relevance": "Used to quantify representative-task variance under the current Stage 3 screening stack.",
+        "status": "selected"
+      }
+    ]
+  },
+  "evidence": {
+    "prior_experiments": [
+      "EXP051",
+      "EXP078",
+      "EXP081"
+    ],
+    "why_now": "EXP078 and EXP081 both produced informative but non-promotable outcomes near the strict baseline boundaries. Before launching more structural families, Stage 3 needs a direct estimate of baseline rerun spread under the current 512-step screening protocol."
+  },
+  "hypothesis": "Rerunning the unchanged refreshed baseline under the exact same 512-step Stage 3 screening protocol will reveal the current noise floor for user-churn, user-ltv, and item-incoterms. This control bundle is not expected to improve performance; it is expected to bound interpretation error.",
+  "common_overrides": {},
+  "task_overrides": {
+    "user-churn": {},
+    "user-ltv": {},
+    "item-incoterms": {}
+  },
+  "notes": [
+    "Control only. Do not treat this as a modeling candidate.",
+    "Purpose: estimate representative-task variance under the active screening protocol before interpreting additional near-boundary deltas."
+  ],
+  "task_launches": {
+    "user-churn": {
+      "target": "lab25211",
+      "gpu": 0,
+      "window_name": "stage3-exp087",
+      "baseline_default_gpu": 5
+    },
+    "user-ltv": {
+      "target": "lab25211",
+      "gpu": 5,
+      "window_name": "stage3-exp088",
+      "baseline_default_gpu": 6
+    },
+    "item-incoterms": {
+      "target": "lab25211",
+      "gpu": 6,
+      "window_name": "stage3-exp089",
+      "baseline_default_gpu": 7
+    }
+  }
+}

@@ -1,0 +1,72 @@
+{
+  "bundle_id": "BUNDLE-069",
+  "slug": "route_consistency_conservative_loss",
+  "title": "Route-consistency conservative loss",
+  "family": "conservative_alignment",
+  "source_type": "paper+ablation",
+  "status": "stopped",
+  "task_run_ids": {
+    "user-churn": "EXP069",
+    "user-ltv": "EXP070",
+    "item-incoterms": "EXP071"
+  },
+  "literature": {
+    "queries": [
+      "graph prompt alignment route consistency schema path signature llm",
+      "graph retrieval alignment route-aware conservative supervision relation path consistency"
+    ],
+    "papers": [
+      {
+        "title": "Can we Soft Prompt LLMs for Graph Learning Tasks?",
+        "url": "https://arxiv.org/abs/2402.10359",
+        "claim": "Graph-text modality mismatch should be addressed at the alignment interface, where structural information is projected into prompt tokens.",
+        "relevance": "Supports adding a prompt-side alignment consistency term keyed to route signatures instead of another coefficient-only scan.",
+        "status": "selected"
+      },
+      {
+        "title": "Toward Graph-Tokenizing Large Language Models with Reconstructive Graph Instruction Tuning",
+        "url": "https://arxiv.org/abs/2603.01385",
+        "claim": "Explicit graph-aware supervision can improve graph-token alignment, but the signal should match the useful structural invariant instead of forcing one global bottleneck.",
+        "relevance": "Supports replacing failed graph-global reconstruction pressure with a narrower route-signature consistency objective.",
+        "status": "selected"
+      },
+      {
+        "title": "Graph Retrieval-Augmented Generation: A Survey",
+        "url": "https://arxiv.org/abs/2408.08921",
+        "claim": "Route-aware graph evidence organization is a first-class design axis, not just a prompt-format detail.",
+        "relevance": "Supports testing route-signature preservation as a structural alignment mechanism before escalating to sampling-layer changes.",
+        "status": "selected"
+      }
+    ]
+  },
+  "evidence": {
+    "prior_experiments": [
+      "EXP060",
+      "EXP063",
+      "EXP066"
+    ],
+    "why_now": "EXP060, EXP063, and EXP066 all preserved the same failure pattern: stronger or more local conservative alignment keeps helping user-churn, but user-ltv and item-incoterms still regress. After FK-direction alone proved too narrow to recover cross-task stability, the next paper-backed step inside the same family is to preserve route-signature consistency across sampled evidence paths."
+  },
+  "hypothesis": "The current alignment path still allows tokens coming from the same sampled schema-route pattern to drift apart across examples, so the LLM sees structurally similar evidence encoded inconsistently. Adding a modest batch-level route-signature consistency penalty on token-query states should preserve readability of repeated evidence routes, keep the classification-side gains from stronger alignment, and be broader than FK-direction without falling back to graph-global reconstruction.",
+  "common_overrides": {
+    "basis_lambda_route_consistency": 0.05
+  },
+  "task_gpus": {
+    "user-churn": 0,
+    "user-ltv": 5,
+    "item-incoterms": 6
+  },
+  "task_overrides": {
+    "user-churn": {},
+    "user-ltv": {},
+    "item-incoterms": {}
+  },
+  "notes": [
+    "This is a finetune-only route-aware conservative loss candidate; do not use pretrain or --pretrain.",
+    "Implementation scope is intentionally isolated: add only one route-signature consistency term on top of the refreshed 512-step screening baseline.",
+    "If this broader route-aware loss still repeats the churn-up / ltv-down / incoterms-down pattern, the next step should switch layers toward bridge- and route-aware sampling rather than another near-duplicate loss rerun.",
+    "Launched on 2026-05-07 after syncing the updated main.py/model.py route-consistency patch plus generated wrappers and launcher to the remote repo and /tmp.",
+    "Completed on 2026-05-07 with global verdict: failed.",
+    "user-churn was neutral, while user-ltv and item-incoterms both regressed against the refreshed 512-step strict baselines."
+  ]
+}

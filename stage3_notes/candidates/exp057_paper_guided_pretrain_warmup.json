@@ -1,0 +1,69 @@
+{
+  "bundle_id": "BUNDLE-057",
+  "slug": "paper_guided_pretrain_warmup",
+  "title": "Paper-guided graph-aware pretrain warmup",
+  "family": "graph_pretraining",
+  "source_type": "paper+ablation",
+  "status": "stopped",
+  "task_run_ids": {
+    "user-churn": "EXP057",
+    "user-ltv": "EXP058",
+    "item-incoterms": "EXP059"
+  },
+  "literature": {
+    "queries": [
+      "graph-aware language model pretraining graph prompt tabular llm alignment",
+      "reconstructive graph instruction tuning auxiliary pretraining graph token llm"
+    ],
+    "papers": [
+      {
+        "title": "Graph-Aware Language Model Pre-Training on a Large Graph Corpus Can Help Multiple Graph Applications",
+        "url": "https://arxiv.org/abs/2306.02592",
+        "claim": "Graph-aware pretraining improves downstream transfer across multiple graph tasks more reliably than local prompt-side tweaks.",
+        "relevance": "Supports spending the next Stage 3 slot on representation/alignment pretraining rather than another basis coefficient scan.",
+        "status": "selected"
+      },
+      {
+        "title": "Toward Graph-Tokenizing Large Language Models with Reconstructive Graph Instruction Tuning",
+        "url": "https://arxiv.org/abs/2603.01385",
+        "claim": "Stronger graph-alignment supervision improves graph-token transfer and reduces text-dominant bias.",
+        "relevance": "Supports testing an explicit warmup phase before task finetuning, even with the currently available pretrain path.",
+        "status": "selected"
+      },
+      {
+        "title": "Can we Soft Prompt LLMs for Graph Learning Tasks?",
+        "url": "https://arxiv.org/abs/2402.10359",
+        "claim": "Alignment quality is a central bottleneck for graph soft prompts.",
+        "relevance": "Supports shifting the next candidate from prompt/basis mixing to representation warmup.",
+        "status": "selected"
+      }
+    ]
+  },
+  "evidence": {
+    "prior_experiments": [
+      "EXP039",
+      "EXP042",
+      "EXP045",
+      "EXP054"
+    ],
+    "why_now": "Prompt-side, basis-side, and simple retrieval-side scans have all failed to produce a non-regressive bundle. The paper shortlist already pointed toward representation/alignment pretraining as the next higher-value slot, and the current codebase has an existing pretrain path that can be screened immediately."
+  },
+  "hypothesis": "A short graph-aware pretrain warmup before task finetuning can improve cross-task stability by strengthening the graph-text interface upstream of prompt injection. Even the existing masked-cell / statement-correctness pretrain path may provide a better initialization than continuing to hand-tune basis residual coefficients.",
+  "common_overrides": {
+    "pretrain": true,
+    "pretrain_epochs": 5
+  },
+  "task_overrides": {
+    "user-churn": {},
+    "user-ltv": {},
+    "item-incoterms": {}
+  },
+  "notes": [
+    "This is the first pretraining-side Stage 3 screening candidate under the refreshed 512-step protocol.",
+    "Keep the rest of the strict screening setup unchanged; only add a short pretrain warmup.",
+    "If this fails broadly, the next step should likely require a more explicit alignment/reconstruction loss change rather than another no-code scan.",
+    "Launched on 2026-05-05 under the refreshed 512-step strict baseline.",
+    "All three runs failed before the first evaluation step because the current pretrain path expects batch[select_table].df, which is not present on the remote NodeStorage objects.",
+    "Judge could not produce a metric report because no evaluation lines were emitted; treat this bundle as implementation-blocked and failed."
+  ]
+}

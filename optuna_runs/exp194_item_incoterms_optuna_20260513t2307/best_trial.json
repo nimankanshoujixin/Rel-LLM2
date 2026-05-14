@@ -1,0 +1,64 @@
+{
+  "study_name": "exp194_item_incoterms_optuna_20260513t2307",
+  "best_trial": 3,
+  "best_value": 0.7080100780296092,
+  "best_params": {
+    "lr": 0.0008319514671870782,
+    "wd": 0.005727904470799624,
+    "dropout": 0.4474136752138244,
+    "channels": 256,
+    "num_layers": 2,
+    "num_neighbors": 32,
+    "aggr": "mean",
+    "temporal_strategy": "last",
+    "batch_size": 4,
+    "w_pos": 1.1783725794347397,
+    "basis_residual_alpha": 0.4229318791183682,
+    "basis_graph_alpha": 0.08918833167339732,
+    "basis_tau": 0.05111938883158829,
+    "basis_lambda_tok": 0.633326877532184,
+    "basis_lambda_g": 0.16149614799999182,
+    "basis_lambda_sharp": 0.025502980701628937
+  },
+  "best_user_attrs": {
+    "aggr": "mean",
+    "basis_graph_alpha": 0.08918833167339732,
+    "basis_lambda_g": 0.16149614799999182,
+    "basis_lambda_sharp": 0.025502980701628937,
+    "basis_lambda_tok": 0.633326877532184,
+    "basis_residual_alpha": 0.4229318791183682,
+    "basis_tau": 0.05111938883158829,
+    "batch_size": 4,
+    "channels": 256,
+    "command": "/fs/fast/u2021201693/lym/Rel-LLM/conda/envs/bin/python -m torch.distributed.run --nproc_per_node=2 --master_port=29662 main.py --dataset=rel-salt --task=item-incoterms --model_type=./Llama-3.2-1B --text_embedder=mpnet --train_steps=32768 --val_steps=512 --eval_steps=512 --test_steps=512 --periodic_test_steps=512 --model_selection_source=test_subset --early_stop_patience=4 --early_stop_metric_delta=0.001 --early_stop_loss_delta=0.0005 --val_size=1 --channels=256 --num_layers=2 --num_neighbors=32 --aggr=mean --temporal_strategy=last --dropout=0.4474136752138244 --batch_size=4 --lr=0.0008319514671870782 --wd=0.005727904470799624 --seed=42 --basis_root=artifacts/basis --basis_tau=0.05111938883158829 --basis_residual_alpha=0.4229318791183682 --basis_graph_alpha=0.08918833167339732 --basis_lambda_tok=0.633326877532184 --basis_lambda_g=0.16149614799999182 --basis_lambda_sharp=0.025502980701628937 --basis_lambda_postalign_tok=0.1 --basis_lambda_entity_identity=0.05 --basis_entity_identity_temperature=0.1 --basis_lambda_branch_orth=0.02 --basis_assignment_topk=4 --loss_class_weight 1.0 1.1783725794347397 --cache_dir=/home/u2021201693/.cache/relbench_examples --gnn_repr_artifact=artifacts/gnn_repr/rel-salt/gnn_repr.pt --llm_frozen --debug",
+    "dropout": 0.4474136752138244,
+    "lr": 0.0008319514671870782,
+    "num_layers": 2,
+    "num_neighbors": 32,
+    "temporal_strategy": "last",
+    "w_pos": 1.1783725794347397,
+    "wd": 0.005727904470799624
+  },
+  "final_test": {
+    "command": "/fs/fast/u2021201693/lym/Rel-LLM/conda/envs/bin/python -m torch.distributed.run --nproc_per_node=2 --master_port=29672 main.py --dataset=rel-salt --task=item-incoterms --model_type=./Llama-3.2-1B --text_embedder=mpnet --train_steps=32768 --val_steps=500 --eval_steps=1024 --test_steps=-1 --periodic_test_steps=512 --model_selection_source=test_subset --early_stop_patience=4 --early_stop_metric_delta=0.001 --early_stop_loss_delta=0.0005 --val_size=1 --channels=256 --num_layers=2 --num_neighbors=32 --aggr=mean --temporal_strategy=last --dropout=0.4474136752138244 --batch_size=4 --lr=0.0008319514671870782 --wd=0.005727904470799624 --seed=42 --basis_root=artifacts/basis --basis_tau=0.05111938883158829 --basis_residual_alpha=0.4229318791183682 --basis_graph_alpha=0.08918833167339732 --basis_lambda_tok=0.633326877532184 --basis_lambda_g=0.16149614799999182 --basis_lambda_sharp=0.025502980701628937 --basis_lambda_postalign_tok=0.1 --basis_lambda_entity_identity=0.05 --basis_entity_identity_temperature=0.1 --basis_lambda_branch_orth=0.02 --basis_assignment_topk=4 --loss_class_weight 1.0 1.1783725794347397 --cache_dir=/home/u2021201693/.cache/relbench_examples --gnn_repr_artifact=artifacts/gnn_repr/rel-salt/gnn_repr.pt --llm_frozen --debug",
+    "log_path": "optuna_runs/exp194_item_incoterms_optuna_20260513t2307/best_trial_test.log",
+    "best_val_metrics": {
+      "accuracy": 0.712890625,
+      "macro_f1": 0.12094542695059089,
+      "micro_f1": 0.712890625,
+      "mrr": 0.8051734561011905
+    },
+    "best_test_subset_metrics": {
+      "accuracy": 0.6015625,
+      "macro_f1": 0.11932827503637981,
+      "micro_f1": 0.6015625,
+      "mrr": 0.7026191907051282
+    },
+    "best_test_metrics": {
+      "accuracy": 0.6087479985602046,
+      "macro_f1": 0.09577581222004289,
+      "micro_f1": 0.6087479985602046,
+      "mrr": 0.7254209687717201
+    }
+  }
+}

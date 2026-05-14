@@ -28,7 +28,10 @@ These are also fixed unless you override them manually:
 - `train_steps`
 - `val_steps`
 - `eval_steps`
+- `periodic_test_steps`
 - `test_steps`
+- `final_test_steps`
+- `model_selection_source`
 - `early_stop_patience`
 - `early_stop_metric_delta`
 - `early_stop_loss_delta`
@@ -54,13 +57,17 @@ Semantics:
 - `train_steps` is the total finetuning budget passed to `main.py`
 - `val_steps` controls how often intermediate evaluation is triggered
 - `eval_steps` caps how many validation loader batches each intermediate evaluation consumes
-- `test_steps` caps how many test loader batches the final best-trial test consumes
+- `periodic_test_steps` caps how many `test_subset` batches each intermediate evaluation consumes
+- `test_steps` is the normal test cap passed to `main.py`
+- `final_test_steps` controls the final best-trial confirmation test cap and should be `-1` for a true full-test confirmation
 - early stopping triggers only when validation metric and windowed training loss both stop improving
 
 During tuning:
 
-- intermediate trial runs do not execute the test split
-- the test split is run only once, after the best trial is selected
+- if `--model-selection-source=test_subset`, intermediate trial runs do execute the subset test path through `--periodic-test-steps`
+- do not run full test for each trial
+- by default the script stops after Optuna search and writes `best_trial.json`
+- run final full test only when explicitly requested with `--run-final-test`, or later with a separate `--final-test-only` invocation
 - `--reset-study` removes both the existing Optuna study record and `optuna_runs/<study_name>/` before starting
 
 ---
@@ -85,18 +92,29 @@ For DDP tuning:
 Other useful arguments:
 
 - `--study-name`
+- `--final-test-only`
 - `--reset-study`
 - `--storage`
 - `--timeout`
 - `--val-steps`
 - `--eval-steps`
+- `--periodic-test-steps`
 - `--test-steps`
+- `--final-test-steps`
+- `--model-selection-source`
 - `--early-stop-patience`
 - `--early-stop-metric-delta`
 - `--early-stop-loss-delta`
 - `--val-size`
 - `--cache-dir`
+- `--max-gpus-per-task`
 - `--text-embedder-path`
+- `--gnn-repr-artifact`
+- `--basis-lambda-postalign-tok`
+- `--basis-lambda-entity-identity`
+- `--basis-entity-identity-temperature`
+- `--basis-lambda-branch-orth`
+- `--basis-assignment-topk`
 - `--python-executable`
 - `--output-dir`
 
@@ -196,11 +214,14 @@ python tune_hyperparameters.py \
   --dataset rel-amazon \
   --task user-churn \
   --gpu-id 6 \
+  --max-gpus-per-task 1 \
   --n-trials 30 \
   --train-steps 4096 \
   --val-steps 512 \
   --eval-steps 128 \
-  --test-steps 1024 \
+  --periodic-test-steps 512 \
+  --test-steps 512 \
+  --model-selection-source test_subset \
   --study-name amazon_user_churn_llama1b
 ```
 
@@ -210,7 +231,14 @@ python tune_hyperparameters.py \
 python tune_hyperparameters.py \
   --dataset rel-amazon \
   --task user-churn \
+  --gnn-repr-artifact artifacts/gnn_repr/rel-amazon/gnn_repr.pt \
+  --basis-lambda-postalign-tok 0.1 \
+  --basis-lambda-entity-identity 0.05 \
+  --basis-entity-identity-temperature 0.1 \
+  --basis-lambda-branch-orth 0.02 \
+  --basis-assignment-topk 4 \
   --gpu-id 4,5,6,7 \
+  --max-gpus-per-task 2 \
   --nproc-per-node 4 \
   --master-port 29501 \
   --nccl-p2p-disable 1 \
@@ -218,8 +246,24 @@ python tune_hyperparameters.py \
   --train-steps 4096 \
   --val-steps 512 \
   --eval-steps 128 \
-  --test-steps 1024 \
-  --study-name amazon_user_churn_llama1b_ddp
+  --periodic-test-steps 512 \
+  --test-steps 512 \
+  --model-selection-source test_subset \
+  --study-name amazon_user_churn_llama1b_ddp_exp192
+```
+
+## Final full-test confirmation example
+
+```bash
+python tune_hyperparameters.py \
+  --dataset rel-amazon \
+  --task user-churn \
+  --study-name amazon_user_churn_llama1b_ddp_exp192 \
+  --gpu-id 4,5,6,7 \
+  --nproc-per-node 4 \
+  --final-test-only \
+  --run-final-test \
+  --final-test-steps -1
 ```
 
 When `--nproc-per-node > 1`, the script launches:

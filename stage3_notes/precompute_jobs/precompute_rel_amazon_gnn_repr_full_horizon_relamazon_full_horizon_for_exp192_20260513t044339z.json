@@ -1,0 +1,130 @@
+{
+  "job_id": "precompute_rel_amazon_gnn_repr_full_horizon_relamazon_full_horizon_for_exp192_20260513t044339z",
+  "kind": "graph_cache",
+  "dataset": "rel-amazon",
+  "cache_profile": "gnn_repr_full_horizon",
+  "cache_dir": "~/.cache/relbench_examples",
+  "parallelism_mode": "embed_multi_gpu",
+  "table_names": "",
+  "target": "lab25211",
+  "created_at": "20260513T044339Z",
+  "status": "running",
+  "windows": [
+    {
+      "name": "stage3-cache-rel_amazon-row0",
+      "gpu": 0,
+      "row_shard_index": 0,
+      "row_shard_count": 6,
+      "parallelism_mode": "embed_multi_gpu",
+      "remote_script": "/tmp/stage3-cache-rel_amazon-row0.sh",
+      "remote_log": "/tmp/stage3-cache-rel_amazon-row0.log",
+      "script_lines": [
+        "#!/usr/bin/env bash",
+        "set -euo pipefail",
+        "cd /fs/fast/u2021201693/lym/Rel-LLM",
+        "CUDA_VISIBLE_DEVICES=0 /fs/fast/u2021201693/lym/Rel-LLM/conda/envs/bin/python -u -m precompute.graph_cache --dataset=rel-amazon --cache-profile=gnn_repr_full_horizon --cache_dir=~/.cache/relbench_examples --text_embedder=mpnet --text_embedder_path=./cache --embed_batch_size=256 --device=cuda:0 --num_shards=1 --shard_index=0 --row_shard_count=6 --row_shard_index=0 --shard_output_root=/tmp/rel_amazon_gnn_repr_full_horizon_20260513t044339z_row_shards --force_cpu_aggregate --skip_existing"
+      ],
+      "local_script": "G:\\RelLLM-2\\Rel-LLM-clean-p13\\.codex_remote\\precompute\\stage3-cache-rel_amazon-row0.sh"
+    },
+    {
+      "name": "stage3-cache-rel_amazon-row1",
+      "gpu": 1,
+      "row_shard_index": 1,
+      "row_shard_count": 6,
+      "parallelism_mode": "embed_multi_gpu",
+      "remote_script": "/tmp/stage3-cache-rel_amazon-row1.sh",
+      "remote_log": "/tmp/stage3-cache-rel_amazon-row1.log",
+      "script_lines": [
+        "#!/usr/bin/env bash",
+        "set -euo pipefail",
+        "cd /fs/fast/u2021201693/lym/Rel-LLM",
+        "CUDA_VISIBLE_DEVICES=1 /fs/fast/u2021201693/lym/Rel-LLM/conda/envs/bin/python -u -m precompute.graph_cache --dataset=rel-amazon --cache-profile=gnn_repr_full_horizon --cache_dir=~/.cache/relbench_examples --text_embedder=mpnet --text_embedder_path=./cache --embed_batch_size=256 --device=cuda:0 --num_shards=1 --shard_index=0 --row_shard_count=6 --row_shard_index=1 --shard_output_root=/tmp/rel_amazon_gnn_repr_full_horizon_20260513t044339z_row_shards --force_cpu_aggregate --skip_existing"
+      ],
+      "local_script": "G:\\RelLLM-2\\Rel-LLM-clean-p13\\.codex_remote\\precompute\\stage3-cache-rel_amazon-row1.sh"
+    },
+    {
+      "name": "stage3-cache-rel_amazon-row2",
+      "gpu": 2,
+      "row_shard_index": 2,
+      "row_shard_count": 6,
+      "parallelism_mode": "embed_multi_gpu",
+      "remote_script": "/tmp/stage3-cache-rel_amazon-row2.sh",
+      "remote_log": "/tmp/stage3-cache-rel_amazon-row2.log",
+      "script_lines": [
+        "#!/usr/bin/env bash",
+        "set -euo pipefail",
+        "cd /fs/fast/u2021201693/lym/Rel-LLM",
+        "CUDA_VISIBLE_DEVICES=2 /fs/fast/u2021201693/lym/Rel-LLM/conda/envs/bin/python -u -m precompute.graph_cache --dataset=rel-amazon --cache-profile=gnn_repr_full_horizon --cache_dir=~/.cache/relbench_examples --text_embedder=mpnet --text_embedder_path=./cache --embed_batch_size=256 --device=cuda:0 --num_shards=1 --shard_index=0 --row_shard_count=6 --row_shard_index=2 --shard_output_root=/tmp/rel_amazon_gnn_repr_full_horizon_20260513t044339z_row_shards --force_cpu_aggregate --skip_existing"
+      ],
+      "local_script": "G:\\RelLLM-2\\Rel-LLM-clean-p13\\.codex_remote\\precompute\\stage3-cache-rel_amazon-row2.sh"
+    },
+    {
+      "name": "stage3-cache-rel_amazon-row3",
+      "gpu": 4,
+      "row_shard_index": 3,
+      "row_shard_count": 6,
+      "parallelism_mode": "embed_multi_gpu",
+      "remote_script": "/tmp/stage3-cache-rel_amazon-row3.sh",
+      "remote_log": "/tmp/stage3-cache-rel_amazon-row3.log",
+      "script_lines": [
+        "#!/usr/bin/env bash",
+        "set -euo pipefail",
+        "cd /fs/fast/u2021201693/lym/Rel-LLM",
+        "CUDA_VISIBLE_DEVICES=4 /fs/fast/u2021201693/lym/Rel-LLM/conda/envs/bin/python -u -m precompute.graph_cache --dataset=rel-amazon --cache-profile=gnn_repr_full_horizon --cache_dir=~/.cache/relbench_examples --text_embedder=mpnet --text_embedder_path=./cache --embed_batch_size=256 --device=cuda:0 --num_shards=1 --shard_index=0 --row_shard_count=6 --row_shard_index=3 --shard_output_root=/tmp/rel_amazon_gnn_repr_full_horizon_20260513t044339z_row_shards --force_cpu_aggregate --skip_existing"
+      ],
+      "local_script": "G:\\RelLLM-2\\Rel-LLM-clean-p13\\.codex_remote\\precompute\\stage3-cache-rel_amazon-row3.sh"
+    },
+    {
+      "name": "stage3-cache-rel_amazon-row4",
+      "gpu": 5,
+      "row_shard_index": 4,
+      "row_shard_count": 6,
+      "parallelism_mode": "embed_multi_gpu",
+      "remote_script": "/tmp/stage3-cache-rel_amazon-row4.sh",
+      "remote_log": "/tmp/stage3-cache-rel_amazon-row4.log",
+      "script_lines": [
+        "#!/usr/bin/env bash",
+        "set -euo pipefail",
+        "cd /fs/fast/u2021201693/lym/Rel-LLM",
+        "CUDA_VISIBLE_DEVICES=5 /fs/fast/u2021201693/lym/Rel-LLM/conda/envs/bin/python -u -m precompute.graph_cache --dataset=rel-amazon --cache-profile=gnn_repr_full_horizon --cache_dir=~/.cache/relbench_examples --text_embedder=mpnet --text_embedder_path=./cache --embed_batch_size=256 --device=cuda:0 --num_shards=1 --shard_index=0 --row_shard_count=6 --row_shard_index=4 --shard_output_root=/tmp/rel_amazon_gnn_repr_full_horizon_20260513t044339z_row_shards --force_cpu_aggregate --skip_existing"
+      ],
+      "local_script": "G:\\RelLLM-2\\Rel-LLM-clean-p13\\.codex_remote\\precompute\\stage3-cache-rel_amazon-row4.sh"
+    },
+    {
+      "name": "stage3-cache-rel_amazon-row5",
+      "gpu": 6,
+      "row_shard_index": 5,
+      "row_shard_count": 6,
+      "parallelism_mode": "embed_multi_gpu",
+      "remote_script": "/tmp/stage3-cache-rel_amazon-row5.sh",
+      "remote_log": "/tmp/stage3-cache-rel_amazon-row5.log",
+      "script_lines": [
+        "#!/usr/bin/env bash",
+        "set -euo pipefail",
+        "cd /fs/fast/u2021201693/lym/Rel-LLM",
+        "CUDA_VISIBLE_DEVICES=6 /fs/fast/u2021201693/lym/Rel-LLM/conda/envs/bin/python -u -m precompute.graph_cache --dataset=rel-amazon --cache-profile=gnn_repr_full_horizon --cache_dir=~/.cache/relbench_examples --text_embedder=mpnet --text_embedder_path=./cache --embed_batch_size=256 --device=cuda:0 --num_shards=1 --shard_index=0 --row_shard_count=6 --row_shard_index=5 --shard_output_root=/tmp/rel_amazon_gnn_repr_full_horizon_20260513t044339z_row_shards --force_cpu_aggregate --skip_existing"
+      ],
+      "local_script": "G:\\RelLLM-2\\Rel-LLM-clean-p13\\.codex_remote\\precompute\\stage3-cache-rel_amazon-row5.sh"
+    },
+    {
+      "name": "stage3-cache-rel_amazon-merge",
+      "gpu": null,
+      "role": "merge",
+      "parallelism_mode": "embed_multi_gpu",
+      "remote_script": "/tmp/stage3-cache-rel_amazon-merge.sh",
+      "remote_log": "/tmp/stage3-cache-rel_amazon-merge.log",
+      "script_lines": [
+        "#!/usr/bin/env bash",
+        "set -euo pipefail",
+        "cd /fs/fast/u2021201693/lym/Rel-LLM",
+        "while true; do",
+        "  active=0; for name in stage3-cache-rel_amazon-row0 stage3-cache-rel_amazon-row1 stage3-cache-rel_amazon-row2 stage3-cache-rel_amazon-row3 stage3-cache-rel_amazon-row4 stage3-cache-rel_amazon-row5; do tmux list-windows -t lymtmux 2>/dev/null | grep -q \"$name\" && active=1; done",
+        "  if [ \"$active\" -eq 0 ]; then break; fi",
+        "  sleep 20",
+        "done",
+        "/fs/fast/u2021201693/lym/Rel-LLM/conda/envs/bin/python -u -m precompute.graph_cache --dataset=rel-amazon --cache-profile=gnn_repr_full_horizon --cache_dir=~/.cache/relbench_examples --text_embedder=mpnet --text_embedder_path=./cache --embed_batch_size=256 --device=cpu --num_shards=1 --shard_index=0 --merge_shards_only --row_shard_count=6 --shard_output_root=/tmp/rel_amazon_gnn_repr_full_horizon_20260513t044339z_row_shards --skip_existing"
+      ],
+      "local_script": "G:\\RelLLM-2\\Rel-LLM-clean-p13\\.codex_remote\\precompute\\stage3-cache-rel_amazon-merge.sh"
+    }
+  ]
+}

@@ -1,0 +1,51 @@
+{
+  "bundle_id": "BUNDLE-054",
+  "slug": "basis_token_only_rerun_512",
+  "title": "Token-only basis residual rerun under 512-step screening",
+  "family": "basis_injection",
+  "source_type": "ablation",
+  "status": "stopped",
+  "task_run_ids": {
+    "user-churn": "EXP054",
+    "user-ltv": "EXP055",
+    "item-incoterms": "EXP056"
+  },
+  "literature": {
+    "queries": [
+      "token-level residual alignment graph prompting llm tabular reasoning",
+      "graph-level prompt residual ablation basis alignment language model rerun"
+    ],
+    "papers": []
+  },
+  "evidence": {
+    "prior_experiments": [
+      "EXP036",
+      "EXP037",
+      "EXP038",
+      "EXP039",
+      "EXP040",
+      "EXP041",
+      "EXP042",
+      "EXP043",
+      "EXP044"
+    ],
+    "why_now": "Across the completed basis-side bundles, token-only basis residual is still the strongest partial win: user-ltv improved and item-incoterms stayed neutral, while user-churn alone killed the bundle. After the screening protocol changed from 128 to 512, this is the highest-value candidate to rerun before inventing a more invasive code change."
+  },
+  "hypothesis": "Removing only graph-level basis residual injection while keeping token-level basis residual may still be the best narrow basis-side tradeoff. Under the more stable 512-step screening protocol, the previous user-churn regression may shrink enough to tell us whether this family deserves further work or should be retired completely.",
+  "common_overrides": {
+    "basis_graph_alpha": 0.0
+  },
+  "task_overrides": {
+    "user-churn": {},
+    "user-ltv": {},
+    "item-incoterms": {}
+  },
+  "notes": [
+    "Prepared while waiting for the 512-step baseline refresh to finish.",
+    "baseline_registry.json has now been refreshed from EXP051/052/053.",
+    "Launched on 2026-05-05 under the 512-step strict screening protocol.",
+    "Run to completion under training-level early stop only; do not use bundle-level manual kill.",
+    "Completed on 2026-05-05 with global verdict: failed.",
+    "user-ltv improved, but user-churn and item-incoterms both regressed against the refreshed 512-step strict baselines."
+  ]
+}

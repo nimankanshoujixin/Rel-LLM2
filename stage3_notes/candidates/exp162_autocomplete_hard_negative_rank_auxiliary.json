@@ -1,0 +1,112 @@
+{
+  "bundle_id": "BUNDLE-162",
+  "slug": "autocomplete_hard_negative_rank_auxiliary",
+  "title": "Autocomplete hard-negative rank auxiliary",
+  "family": "label_interface",
+  "source_type": "ablation",
+  "launch_mode": "packed_batch_equivalent",
+  "status": "failed",
+  "task_cost_weights": {
+    "user-churn": 1.0,
+    "user-ltv": 1.2,
+    "item-incoterms": 2.5
+  },
+  "task_run_ids": {
+    "user-churn": "EXP162",
+    "user-ltv": "EXP163",
+    "item-incoterms": "EXP164"
+  },
+  "literature": {
+    "queries": [
+      "hard negative ranking loss multiclass candidate ranking",
+      "candidate ranking auxiliary loss MRR multiclass classification"
+    ],
+    "papers": [
+      {
+        "title": "",
+        "url": "",
+        "claim": "",
+        "relevance": "",
+        "status": "not_required_for_ablation"
+      }
+    ]
+  },
+  "evidence": {
+    "prior_experiments": [
+      "EXP108",
+      "EXP126",
+      "EXP129",
+      "EXP156",
+      "EXP159"
+    ],
+    "why_now": "EXP108 showed that the raw-label / prefix-style baseline surface can preserve the salt-side item-incoterms ranking signal near the strict baseline, while EXP129, EXP156, and EXP159 showed that replacing or lightly residualizing that surface still leaves item-incoterms clearly worse. EXP126 also showed that autoregressive shortlist reranking is too expensive for routine screening. The next justified step is therefore to keep the cheap O(C) candidate-score surface and add a direct hard-negative ranking objective aligned with MRR, rather than adding another scorer-replacement or residual-scale variant."
+  },
+  "hypothesis": "If item-incoterms is failing because cross-entropy over candidate logits does not put enough pressure on the hardest wrong candidate under the cheap scorer, then adding a margin-free hard-negative ranking auxiliary should improve MRR-style ordering while preserving the scalable Stage 4-compatible sample-candidate scoring interface. The mechanism changes the supervision signal, not the residual scale, token-stat feature set, prompt packaging, sampling, or pretrain path.",
+  "common_overrides": {
+    "autocomplete_rank_auxiliary": true
+  },
+  "task_overrides": {
+    "user-churn": {},
+    "user-ltv": {},
+    "item-incoterms": {}
+  },
+  "notes": [
+    "Keep Stage 3 finetune-only; do not introduce pretrain, sampling, packaging, or route-aware conservative losses.",
+    "This candidate does not change autocomplete_decision_interface and does not use candidate_pairwise_ar_hybrid or any O(L*C) scorer.",
+    "The hard-negative auxiliary is applied only for autocomplete multiclass tasks; user-churn and user-ltv should act as no-op drift controls.",
+    "The auxiliary loss is margin-free softplus(hardest_negative_score - true_label_score), so this first screen does not manually scan a new margin or residual scale.",
+    "Use packed_batch_equivalent scheduling to preserve each task's effective global batch while improving GPU utilization.",
+    "Launched on 2026-05-09 through the local Stage 3 launcher.",
+    "Resolved packed batch-equivalent placement at launch time: user-churn -> lab25211 GPUs 0,5 with per-rank batch 2 in wave 0; user-ltv -> lab25211 GPUs 6,7 with per-rank batch 1 in wave 0; item-incoterms -> lab25211 GPUs 0,5,6,7 with per-rank batch 1 in wave 1.",
+    "First post-launch status check showed EXP162 and EXP163 windows up in startup / DB-load; EXP164 is correctly waiting for wave 1; orchestrator recommendation: keep_watching.",
+    "Completed on 2026-05-09 with global verdict: failed.",
+    "EXP162 user-churn is abnormal rather than scientific evidence: it received SIGTERM before the first evaluation on lab25211 GPUs 0,5, with local_rank 0 corresponding to physical GPU0 under CUDA_VISIBLE_DEVICES=0,5.",
+    "EXP163 user-ltv completed with mae=76.62298232233618, which is neutral under the wide replay-aware effective delta.",
+    "EXP164 item-incoterms completed with mrr=0.7555898718252234, better than recent collapse plateaus but still clearly worse than strict baseline mrr=0.8147880873466811 under the 0.013037038915945098 effective threshold.",
+    "Because item-incoterms is decisively worse, do not rerun EXP162 just to recover the missing churn control.",
+    "Conclusion: the hard-negative auxiliary changed the salt-side failure mode upward, but not enough to make the default candidate-score surface promotable."
+  ],
+  "task_launches": {
+    "user-churn": {
+      "target": "lab25211",
+      "gpu": [
+        0,
+        5
+      ],
+      "window_name": "stage3-exp162",
+      "baseline_default_gpu": 5,
+      "per_rank_batch_size": 2,
+      "launch_world_size": 2,
+      "launch_mode": "packed_batch_equivalent",
+      "launch_wave": 0
+    },
+    "user-ltv": {
+      "target": "lab25211",
+      "gpu": [
+        6,
+        7
+      ],
+      "window_name": "stage3-exp163",
+      "baseline_default_gpu": 6,
+      "per_rank_batch_size": 1,
+      "launch_world_size": 2,
+      "launch_mode": "packed_batch_equivalent",
+      "launch_wave": 0
+    },
+    "item-incoterms": {
+      "target": "lab25211",
+      "gpu": [
+        0,
+        5,
+        6,
+        7
+      ],
+      "window_name": "stage3-exp164",
+      "baseline_default_gpu": 7,
+      "per_rank_batch_size": 1,
+      "launch_world_size": 4,
+      "launch_mode": "packed_batch_equivalent",
+      "launch_wave": 1
+    }
+  }
+}

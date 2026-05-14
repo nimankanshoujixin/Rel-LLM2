@@ -1,0 +1,77 @@
+{
+  "bundle_id": "BUNDLE-075",
+  "slug": "confidence_calibrated_basis_gating",
+  "title": "Confidence-calibrated basis gating",
+  "family": "basis_injection",
+  "source_type": "paper+ablation",
+  "status": "stopped",
+  "task_run_ids": {
+    "user-churn": "EXP075",
+    "user-ltv": "EXP076",
+    "item-incoterms": "EXP077"
+  },
+  "literature": {
+    "queries": [
+      "graph soft prompt confidence gating alignment residual graph llm",
+      "graph prompt projection confidence calibration basis residual gating structured evidence"
+    ],
+    "papers": [
+      {
+        "title": "Can we Soft Prompt LLMs for Graph Learning Tasks?",
+        "url": "https://arxiv.org/abs/2402.10359",
+        "claim": "Graph-text transfer quality depends on the prompt-side projection interface, so safer prompt injection can matter as much as adding stronger supervision.",
+        "relevance": "Supports modifying basis residual injection itself, not only its auxiliary losses, when alignment signals have become unstable across tasks.",
+        "status": "selected"
+      },
+      {
+        "title": "G-Retriever: Retrieval-Augmented Generation for Graph Question Answering",
+        "url": "https://arxiv.org/abs/2402.07630",
+        "claim": "Compressed graph prompts lose fidelity when noisy evidence is injected without enough selectivity.",
+        "relevance": "Supports making prompt-side basis injection more selective instead of uniformly mixing every residual into every prompt token.",
+        "status": "selected"
+      },
+      {
+        "title": "Graph Retrieval-Augmented Generation: A Survey",
+        "url": "https://arxiv.org/abs/2408.08921",
+        "claim": "Graph-enhanced generation quality depends on how structural evidence is organized and exposed to the language model, not only on encoder strength.",
+        "relevance": "Supports a confidence-aware gating bundle as a structure-preserving interface change after sampling-side heuristics failed globally.",
+        "status": "selected"
+      }
+    ]
+  },
+  "evidence": {
+    "prior_experiments": [
+      "EXP039",
+      "EXP042",
+      "EXP054",
+      "EXP072"
+    ],
+    "why_now": "EXP039 and EXP054 showed that removing graph residual injection helps user-ltv but is not globally safe, while EXP042 showed that simple graph-side rebalance still regresses user-churn. EXP072 then showed that switching to prompt-side sampling alone can make all three representative tasks worse. The next evidence-backed branch is therefore to keep the existing basis channel but make residual injection conditional on basis posterior confidence."
+  },
+  "hypothesis": "The current basis path likely over-injects low-confidence residuals into prompt tokens, which preserves some classification-side structure but destabilizes regression and salt-side ranking. Scaling token and graph residual mixing by the sharpness of the inferred basis posterior should keep confident basis transfers alive while damping noisy graph-side perturbations, making this a safer global candidate than either constant graph residuals or more aggressive sampling heuristics.",
+  "common_overrides": {
+    "basis_gate_strategy": "confidence",
+    "basis_gate_token_floor": 0.35,
+    "basis_gate_graph_floor": 0.0
+  },
+  "task_gpus": {
+    "user-churn": 0,
+    "user-ltv": 5,
+    "item-incoterms": 6
+  },
+  "task_overrides": {
+    "user-churn": {},
+    "user-ltv": {},
+    "item-incoterms": {}
+  },
+  "notes": [
+    "This candidate returns to the basis construction / injection layer after the first bridge_route sampling bundle failed globally.",
+    "Implementation scope is intentionally narrow: keep the existing basis losses and residual paths, but scale token- and graph-side residual mixing by basis posterior confidence.",
+    "Do not add pretrain, do not revisit the saturated route-aware conservative loss family, and do not relaunch near-duplicate sampling heuristics while this bundle is active.",
+    "Launched on 2026-05-07 after syncing the updated main.py/model.py gating patch plus generated wrappers and launcher to the remote repo and /tmp.",
+    "Selected currently idle GPUs at launch time: user-churn on GPU 0, user-ltv on GPU 5, item-incoterms on GPU 6.",
+    "First orchestrator status check shows all three windows up and logs at remote DB-load stage.",
+    "Completed on 2026-05-07 with global verdict: failed.",
+    "Confidence-calibrated gating reduced the size of the churn regression versus EXP072, but all three representative tasks still remained below the refreshed 512-step strict baselines."
+  ]
+}

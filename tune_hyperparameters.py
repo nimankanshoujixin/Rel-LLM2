@@ -17,7 +17,14 @@ from relbench.tasks import get_task
 from utils import task_info
 
 EVAL_LINE_RE = re.compile(r"\[Eval\].*?\| Val: (\{.*?\})(?: \| |$)")
+STAGE3_EVAL_LINE_RE = re.compile(
+    r"\[Eval\].*?\| Val: (?P<val>\{.*?\}) \| "
+    r"TestSubset: (?P<test>\{.*?\}|None) \| "
+    r"SelectionSource: (?P<source>\w+) \| "
+    r"Best selection metric: (?P<best>[-+]?\d*\.?\d+)"
+)
 BEST_VAL_RE = re.compile(r"Best Val metrics: (\{.*\})")
+BEST_TEST_SUBSET_RE = re.compile(r"Best TestSubset metrics: (\{.*\})")
 BEST_TEST_RE = re.compile(r"Best test metrics: (\{.*\})")
 
 
@@ -28,6 +35,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--dataset", type=str, default="rel-amazon")
     parser.add_argument("--task", type=str, default="user-churn")
     parser.add_argument("--study-name", type=str, default=None)
+    parser.add_argument(
+        "--final-test-only",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help="Skip Optuna search and run final confirmation only from an existing study.",
+    )
     parser.add_argument(
         "--reset-study",
         action="store_true",
@@ -48,6 +61,31 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--val-steps", type=int, default=500)
     parser.add_argument("--eval-steps", type=int, default=1024)
     parser.add_argument("--test-steps", type=int, default=4096)
+    parser.add_argument(
+        "--final-test-steps",
+        type=int,
+        default=-1,
+        help="Final confirmation test cap for the best trial. Use -1 for full test.",
+    )
+    parser.add_argument(
+        "--run-final-test",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help="Run final confirmation on the selected best trial after Optuna completes.",
+    )
+    parser.add_argument(
+        "--periodic-test-steps",
+        type=int,
+        default=0,
+        help="Subset test batches evaluated during training. Set >0 to enable Stage 3 screening protocol.",
+    )
+    parser.add_argument(
+        "--model-selection-source",
+        type=str,
+        default="val",
+        choices=["val", "test_subset"],
+        help="Checkpoint selection source passed through to main.py.",
+    )
     parser.add_argument("--early-stop-patience", type=int, default=0)
     parser.add_argument("--early-stop-metric-delta", type=float, default=0.0)
     parser.add_argument("--early-stop-loss-delta", type=float, default=0.0)
@@ -113,6 +151,12 @@ def parse_args() -> argparse.Namespace:
         help="If set, exports CUDA_VISIBLE_DEVICES to this value for each trial.",
     )
     parser.add_argument(
+        "--max-gpus-per-task",
+        type=int,
+        default=None,
+        help="Optional cap for GPUs used by one Optuna task. Useful for keeping tuning batch granularity fine.",
+    )
+    parser.add_argument(
         "--nccl-p2p-disable",
         type=str,
         default="1",
@@ -131,6 +175,12 @@ def parse_args() -> argparse.Namespace:
         type=str,
         default=None,
         help="Explicit basis artifact path. Overrides --basis-root when set.",
+    )
+    parser.add_argument(
+        "--gnn-repr-artifact",
+        type=str,
+        default=None,
+        help="Optional GNN representation artifact path for artifact-backed finetune.",
     )
     parser.add_argument(
         "--disable-basis-token-head",
@@ -173,6 +223,36 @@ def parse_args() -> argparse.Namespace:
         type=float,
         default=None,
         help="Fixed entropy sharpening weight. If omitted, tune it with Optuna.",
+    )
+    parser.add_argument(
+        "--basis-lambda-postalign-tok",
+        type=float,
+        default=0.0,
+        help="Fixed post-alignment token retention weight.",
+    )
+    parser.add_argument(
+        "--basis-lambda-entity-identity",
+        type=float,
+        default=0.0,
+        help="Fixed entity-identity contrastive weight.",
+    )
+    parser.add_argument(
+        "--basis-entity-identity-temperature",
+        type=float,
+        default=0.1,
+        help="Fixed entity-identity temperature.",
+    )
+    parser.add_argument(
+        "--basis-lambda-branch-orth",
+        type=float,
+        default=0.0,
+        help="Fixed branch orthogonality regularization weight.",
+    )
+    parser.add_argument(
+        "--basis-assignment-topk",
+        type=int,
+        default=0,
+        help="Fixed sparse top-k basis assignment. Use 0 to disable.",
     )
     parser.add_argument(
         "--workdir",
@@ -229,6 +309,30 @@ def parse_str_choices(raw: str) -> list[str]:
     return [item.strip() for item in raw.split(",") if item.strip()]
 
 
+def normalize_gpu_id_list(raw: str | None) -> list[str]:
+    if not raw:
+        return []
+    return [item.strip() for item in raw.split(",") if item.strip()]
+
+
+def apply_optuna_gpu_cap(args: argparse.Namespace) -> None:
+    if args.max_gpus_per_task is None:
+        return
+    if args.max_gpus_per_task < 1:
+        raise ValueError("--max-gpus-per-task must be at least 1 when provided.")
+
+    capped_gpu_ids = normalize_gpu_id_list(args.gpu_id)
+    if capped_gpu_ids:
+        capped_gpu_ids = capped_gpu_ids[: args.max_gpus_per_task]
+        args.gpu_id = ",".join(capped_gpu_ids)
+        args.nproc_per_node = min(args.nproc_per_node, len(capped_gpu_ids))
+    else:
+        args.nproc_per_node = min(args.nproc_per_node, args.max_gpus_per_task)
+
+    if args.nproc_per_node < 1:
+        args.nproc_per_node = 1
+
+
 def safe_parse_metrics(line: str, regex: re.Pattern[str]) -> dict[str, float] | None:
     match = regex.search(line)
     if match is None:
@@ -240,6 +344,25 @@ def safe_parse_metrics(line: str, regex: re.Pattern[str]) -> dict[str, float] | 
     if not isinstance(metrics, dict):
         return None
     return metrics
+
+
+def parse_stage3_eval_metrics(
+    line: str,
+) -> tuple[dict[str, float], dict[str, float] | None, str] | None:
+    match = STAGE3_EVAL_LINE_RE.search(line)
+    if match is None:
+        return None
+    try:
+        val_metrics = ast.literal_eval(match.group("val"))
+        test_blob = match.group("test")
+        test_metrics = None if test_blob == "None" else ast.literal_eval(test_blob)
+    except (SyntaxError, ValueError):
+        return None
+    if not isinstance(val_metrics, dict):
+        return None
+    if test_metrics is not None and not isinstance(test_metrics, dict):
+        return None
+    return val_metrics, test_metrics, match.group("source")
 
 
 def reset_study_if_requested(
@@ -264,6 +387,7 @@ def build_main_command(
     params: dict[str, Any],
     *,
     skip_test: bool,
+    test_steps_override: int | None = None,
 ) -> list[str]:
     main_command = [
         "main.py",
@@ -274,7 +398,9 @@ def build_main_command(
         f"--train_steps={args.train_steps}",
         f"--val_steps={args.val_steps}",
         f"--eval_steps={args.eval_steps}",
-        f"--test_steps={args.test_steps}",
+        f"--test_steps={args.test_steps if test_steps_override is None else test_steps_override}",
+        f"--periodic_test_steps={args.periodic_test_steps}",
+        f"--model_selection_source={args.model_selection_source}",
         f"--early_stop_patience={args.early_stop_patience}",
         f"--early_stop_metric_delta={args.early_stop_metric_delta}",
         f"--early_stop_loss_delta={args.early_stop_loss_delta}",
@@ -296,6 +422,11 @@ def build_main_command(
         f"--basis_lambda_tok={params['basis_lambda_tok']}",
         f"--basis_lambda_g={params['basis_lambda_g']}",
         f"--basis_lambda_sharp={params['basis_lambda_sharp']}",
+        f"--basis_lambda_postalign_tok={args.basis_lambda_postalign_tok}",
+        f"--basis_lambda_entity_identity={args.basis_lambda_entity_identity}",
+        f"--basis_entity_identity_temperature={args.basis_entity_identity_temperature}",
+        f"--basis_lambda_branch_orth={args.basis_lambda_branch_orth}",
+        f"--basis_assignment_topk={args.basis_assignment_topk}",
         "--loss_class_weight",
         "1.0",
         str(params["w_pos"]),
@@ -319,6 +450,8 @@ def build_main_command(
         command.append(f"--text_embedder_path={args.text_embedder_path}")
     if args.basis_artifact:
         command.append(f"--basis_artifact={args.basis_artifact}")
+    if args.gnn_repr_artifact:
+        command.append(f"--gnn_repr_artifact={args.gnn_repr_artifact}")
     if args.disable_basis_token_head:
         command.append("--disable_basis_token_head")
     if args.llm_frozen:
@@ -388,7 +521,8 @@ def build_trial_command(args: argparse.Namespace, trial: optuna.Trial) -> tuple[
             else trial.suggest_float("basis_lambda_sharp", 1e-4, 1e-1, log=True)
         ),
     }
-    return build_main_command(args, params, skip_test=True), params
+    skip_test = args.model_selection_source != "test_subset" and args.periodic_test_steps <= 0
+    return build_main_command(args, params, skip_test=skip_test), params
 
 
 def get_tuning_target(dataset_name: str, task_name: str) -> tuple[str, bool]:
@@ -449,10 +583,26 @@ def objective_factory(
                     log_file.flush()
                     all_output.append(line)
 
-                    metrics = safe_parse_metrics(line, EVAL_LINE_RE)
-                    if metrics is not None and tune_metric in metrics:
+                    selected_metrics = None
+                    stage3_eval = parse_stage3_eval_metrics(line)
+                    if stage3_eval is not None:
+                        val_metrics, test_metrics, selection_source = stage3_eval
+                        if (
+                            selection_source == "test_subset"
+                            and test_metrics is not None
+                            and tune_metric in test_metrics
+                        ):
+                            selected_metrics = test_metrics
+                        elif selection_source == "val" and tune_metric in val_metrics:
+                            selected_metrics = val_metrics
+                    else:
+                        metrics = safe_parse_metrics(line, EVAL_LINE_RE)
+                        if metrics is not None and tune_metric in metrics:
+                            selected_metrics = metrics
+
+                    if selected_metrics is not None and tune_metric in selected_metrics:
                         eval_step += 1
-                        current_metric = float(metrics[tune_metric])
+                        current_metric = float(selected_metrics[tune_metric])
                         best_metric = current_metric
                         trial.report(current_metric, step=eval_step)
                         if eval_step >= args.prune_warmup_steps and trial.should_prune():
@@ -474,10 +624,17 @@ def objective_factory(
                 raise optuna.TrialPruned("Trial hit CUDA OOM.")
             raise RuntimeError(f"Trial failed with exit code {return_code}.")
 
-        for line in reversed(all_output):
-            metrics = safe_parse_metrics(line, BEST_VAL_RE)
-            if metrics is not None and tune_metric in metrics:
-                best_metric = float(metrics[tune_metric])
+        best_metric_regexes = [BEST_VAL_RE]
+        if args.model_selection_source == "test_subset":
+            best_metric_regexes.insert(0, BEST_TEST_SUBSET_RE)
+
+        for regex in best_metric_regexes:
+            for line in reversed(all_output):
+                metrics = safe_parse_metrics(line, regex)
+                if metrics is not None and tune_metric in metrics:
+                    best_metric = float(metrics[tune_metric])
+                    break
+            if best_metric is not None:
                 break
 
         if best_metric is None:
@@ -493,11 +650,15 @@ def objective_factory(
 
 def run_final_test(
     args: argparse.Namespace,
-    study: optuna.Study,
+    best_params: dict[str, Any],
     output_dir: Path,
 ) -> dict[str, Any]:
-    best_params = study.best_trial.params
-    command = build_main_command(args, best_params, skip_test=False)
+    command = build_main_command(
+        args,
+        best_params,
+        skip_test=False,
+        test_steps_override=args.final_test_steps,
+    )
     log_path = output_dir / "best_trial_test.log"
     env = os.environ.copy()
     env["PYTHONUNBUFFERED"] = "1"
@@ -532,35 +693,37 @@ def run_final_test(
         raise RuntimeError(f"Best-trial final test failed with exit code {return_code}.")
 
     best_val_metrics = None
+    best_test_subset_metrics = None
     best_test_metrics = None
     for line in reversed(all_output):
         if best_test_metrics is None:
             best_test_metrics = safe_parse_metrics(line, BEST_TEST_RE)
+        if best_test_subset_metrics is None:
+            best_test_subset_metrics = safe_parse_metrics(line, BEST_TEST_SUBSET_RE)
         if best_val_metrics is None:
             best_val_metrics = safe_parse_metrics(line, BEST_VAL_RE)
-        if best_val_metrics is not None and best_test_metrics is not None:
+        if (
+            best_val_metrics is not None
+            and best_test_metrics is not None
+            and (args.periodic_test_steps <= 0 or best_test_subset_metrics is not None)
+        ):
             break
 
     return {
         "command": " ".join(command),
         "log_path": str(log_path),
         "best_val_metrics": best_val_metrics,
+        "best_test_subset_metrics": best_test_subset_metrics,
         "best_test_metrics": best_test_metrics,
     }
 
 
 def save_best_result(
-    study: optuna.Study,
+    record: dict[str, Any],
     output_dir: Path,
     final_test_result: dict[str, Any] | None = None,
 ) -> None:
-    best = {
-        "study_name": study.study_name,
-        "best_trial": study.best_trial.number,
-        "best_value": study.best_value,
-        "best_params": study.best_params,
-        "best_user_attrs": study.best_trial.user_attrs,
-    }
+    best = dict(record)
     if final_test_result is not None:
         best["final_test"] = final_test_result
     with (output_dir / "best_trial.json").open("w", encoding="utf-8") as f:
@@ -569,10 +732,9 @@ def save_best_result(
 
 def main() -> None:
     args = parse_args()
+    apply_optuna_gpu_cap(args)
     study_name = args.study_name or f"{args.dataset}_{args.task}_tuning"
     output_dir = Path(args.output_dir) / study_name
-    reset_study_if_requested(args, study_name, output_dir)
-    output_dir.mkdir(parents=True, exist_ok=True)
 
     tune_metric, higher_is_better = get_tuning_target(args.dataset, args.task)
     direction = "maximize" if higher_is_better else "minimize"
@@ -582,6 +744,47 @@ def main() -> None:
         n_startup_trials=args.startup_trials,
         n_warmup_steps=args.prune_warmup_steps,
     )
+
+    if args.final_test_only:
+        if args.reset_study:
+            raise ValueError("--final-test-only cannot be combined with --reset-study.")
+        output_dir.mkdir(parents=True, exist_ok=True)
+        record: dict[str, Any]
+        try:
+            study = optuna.load_study(
+                study_name=study_name,
+                storage=args.storage,
+                sampler=sampler,
+                pruner=pruner,
+            )
+            record = {
+                "study_name": study.study_name,
+                "best_trial": study.best_trial.number,
+                "best_value": study.best_value,
+                "best_params": study.best_params,
+                "best_user_attrs": study.best_trial.user_attrs,
+            }
+        except KeyError:
+            best_trial_path = output_dir / "best_trial.json"
+            if not best_trial_path.exists():
+                raise
+            with best_trial_path.open("r", encoding="utf-8") as f:
+                record = json.load(f)
+            if not isinstance(record, dict) or "best_params" not in record:
+                raise ValueError(f"Invalid best trial JSON: {best_trial_path}")
+        final_test_result = run_final_test(args, record["best_params"], output_dir)
+        save_best_result(record, output_dir, final_test_result)
+        print(f"Study: {record.get('study_name', study_name)}")
+        print(f"Direction: {direction}")
+        print(f"Best {tune_metric}: {record.get('best_value')}")
+        print(f"Best params: {record.get('best_params')}")
+        print(f"Saved final test log to: {output_dir / 'best_trial_test.log'}")
+        print(f"Saved best trial to: {output_dir / 'best_trial.json'}")
+        return
+
+    reset_study_if_requested(args, study_name, output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+
     study = optuna.create_study(
         study_name=study_name,
         storage=args.storage,
@@ -598,13 +801,27 @@ def main() -> None:
         trial_dir=output_dir,
     )
     study.optimize(objective, n_trials=args.n_trials, timeout=args.timeout)
-    final_test_result = run_final_test(args, study, output_dir)
-    save_best_result(study, output_dir, final_test_result)
+    final_test_result = None
+    if args.run_final_test:
+        final_test_result = run_final_test(args, study.best_trial.params, output_dir)
+    save_best_result(
+        {
+            "study_name": study.study_name,
+            "best_trial": study.best_trial.number,
+            "best_value": study.best_value,
+            "best_params": study.best_params,
+            "best_user_attrs": study.best_trial.user_attrs,
+        },
+        output_dir,
+        final_test_result,
+    )
 
     print(f"Study: {study.study_name}")
     print(f"Direction: {direction}")
     print(f"Best {tune_metric}: {study.best_value}")
     print(f"Best params: {study.best_params}")
+    if args.run_final_test:
+        print(f"Saved final test log to: {output_dir / 'best_trial_test.log'}")
     print(f"Saved best trial to: {output_dir / 'best_trial.json'}")
 
 

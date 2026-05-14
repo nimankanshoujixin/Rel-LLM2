@@ -1,0 +1,125 @@
+{
+  "bundle_id": "BUNDLE-168",
+  "slug": "autocomplete_late_interaction_scorer",
+  "title": "Autocomplete late-interaction candidate scorer",
+  "family": "label_interface",
+  "source_type": "paper+ablation",
+  "launch_mode": "packed_batch_equivalent",
+  "status": "failed",
+  "gpu_exclude": [
+    0
+  ],
+  "task_cost_weights": {
+    "user-churn": 1.0,
+    "user-ltv": 1.2,
+    "item-incoterms": 2.5
+  },
+  "task_run_ids": {
+    "user-churn": "EXP168",
+    "user-ltv": "EXP169",
+    "item-incoterms": "EXP170"
+  },
+  "literature": {
+    "queries": [
+      "ColBERT late interaction MaxSim token-level retrieval candidate scoring",
+      "PLAID efficient late interaction retrieval centroid pruning ColBERT"
+    ],
+    "papers": [
+      {
+        "title": "ColBERTv2: Effective and Efficient Retrieval via Lightweight Late Interaction",
+        "url": "https://arxiv.org/abs/2112.01488",
+        "claim": "Late interaction uses token-granular multi-vector representations and scalable token-level computations instead of collapsing each side to one vector.",
+        "relevance": "This motivates a non-autoregressive autocomplete scorer that compares prompt/sample tokens with candidate label tokens through batched MaxSim-style late interaction, preserving token-level candidate evidence without per-candidate LLM rollout.",
+        "status": "selected"
+      },
+      {
+        "title": "PLAID: An Efficient Engine for Late Interaction Retrieval",
+        "url": "https://arxiv.org/abs/2205.09707",
+        "claim": "Late-interaction search latency can be reduced substantially with optimized candidate-side approximations while preserving retrieval quality.",
+        "relevance": "This supports treating throughput as part of the architecture: the scorer must be implementable as tensorized candidate-token matching rather than recursive prefix decoding.",
+        "status": "selected"
+      }
+    ]
+  },
+  "evidence": {
+    "prior_experiments": [
+      "EXP099",
+      "EXP108",
+      "EXP126",
+      "EXP156",
+      "EXP159",
+      "EXP165"
+    ],
+    "why_now": "EXP099 showed that candidate-token evidence matters, but the exhaustive autoregressive hybrid is not a scalable endpoint. EXP108 preserved item-incoterms near baseline with shared-prefix candidate-token scoring, but EXP110/EXP167 throughput around 1.25-1.28 train steps/sec shows the current prefix-decoding implementation is too slow for routine Stage 3. EXP156 and EXP159 showed that single-vector token-stat/residual paths are exhausted. A ColBERT-style late-interaction scorer is the next distinct evidence-backed path: keep token-level candidate matching while replacing autoregressive prefix recursion with batched non-autoregressive token interaction."
+  },
+  "hypothesis": "If the missing salt-side signal is fine-grained token-level sample-candidate alignment rather than another pooled label vector or scalar token-stat feature, then a ColBERT-style late-interaction scorer over prompt/sample token vectors and candidate label token vectors should recover more of the EXP099/EXP108 candidate-token signal while keeping training practical through a tensorized non-autoregressive scoring path. The implementation must be Stage 3 finetune-only, candidate-aware, non-O(L*C) with respect to LLM rollout, and must pass a throughput sanity check before launch.",
+  "common_overrides": {
+    "autocomplete_decision_interface": "candidate_pairwise_late_interaction"
+  },
+  "task_overrides": {
+    "user-churn": {},
+    "user-ltv": {},
+    "item-incoterms": {}
+  },
+  "notes": [
+    "Draft only: do not launch until the interface is implemented and validated with py_compile plus a local throughput sanity check.",
+    "Keep Stage 3 finetune-only; do not use --pretrain.",
+    "This is not a pooled-label, fixed token-stat, residual-scale, rank-margin, or shared-prefix rerun.",
+    "The intended information path is ColBERT-style late interaction: token-level candidate matching via batched MaxSim or similar tensorized interaction over candidate label tokens.",
+    "Throughput gate: before launch, confirm that item-incoterms avoids the shared-prefix per-step prefix-decoding bottleneck and does not show the EXP110/EXP167 ~1.25 train steps/sec long-tail signature.",
+    "If implementation cannot avoid material O(candidate_count * label_token_count * sample_token_count) blowup in practice, retire this draft without launching.",
+    "Implementation added on 2026-05-10: candidate_pairwise_late_interaction uses one prompt LLM forward, selects up to 32 valid prompt tokens by sample-representation relevance, and scores class-id plus raw-label candidate tokens with batched MaxSim-style late interaction.",
+    "Validation on 2026-05-10: py_compile passed for tune_hyperparameters.py, main.py, model.py, stage3_research.py, and stage3_orchestrator.py; git diff --check passed; candidate JSON validated.",
+    "Local tensor smoke test could not run because the local Windows environment does not have torch installed; perform the throughput/shape sanity check in the remote training environment before launch.",
+    "Remote sanity check completed on 2026-05-10 before launch: a 64-step item-incoterms run on lab25211 GPU7 entered training, completed cleanly, and reached roughly 5.5 train steps/sec after warmup with validation around 12.8 it/s.",
+    "Throughput sanity conclusion: candidate_pairwise_late_interaction does not show the EXP110/EXP167 shared-prefix ~1.25 train steps/sec long-tail signature in the short item-incoterms check.",
+    "Exclude GPU0 for this candidate only because recent EXP162 evidence showed a pre-eval SIGTERM when user-churn used GPU0 as local_rank 0; global pipeline_config keeps gpu_exclude empty.",
+    "Launched on 2026-05-10 through the local Stage 3 launcher.",
+    "Resolved packed batch-equivalent placement at launch time: user-churn -> lab25211 GPUs 5,6 with per-rank batch 2 in wave 0; user-ltv -> lab25211 GPU 5 with per-rank batch 2 in wave 1; item-incoterms -> lab25211 GPUs 6,7 with per-rank batch 2 in wave 1.",
+    "First post-launch status check showed EXP168 window up in rel-amazon DB-load startup; EXP169 and EXP170 are correctly waiting for wave 1; orchestrator recommendation: keep_watching.",
+    "Completed and finalized on 2026-05-10 with global verdict: failed.",
+    "Result under replay-aware effective deltas: user-churn better, user-ltv neutral, item-incoterms worse.",
+    "Final metrics: EXP168 user-churn roc_auc=0.6888469459130999; EXP169 user-ltv mae=78.29212675422431; EXP170 item-incoterms mrr=0.7227430555555556.",
+    "Throughput conclusion: EXP170 completed naturally with healthy item-incoterms throughput, around 6.1-6.3 train steps/sec in the main training loop and about 13.05 test it/s at final evaluation; this is a scientific failure, not a practical-throughput failure.",
+    "Mechanism conclusion: late interaction improves over the repeated 0.678576 plateau and the EXP159/EXP165 ~0.699 band, but remains far below the strict baseline 0.8147880873466811 and below the stronger hard-negative auxiliary band from EXP164.",
+    "Search-space consequence: do not hand-scan prompt token budget, late-interaction weights, or residual scales as the next move; the naive hidden-token MaxSim path is insufficient unless a new paper- or ablation-backed mechanism changes the information path."
+  ],
+  "task_launches": {
+    "user-churn": {
+      "target": "lab25211",
+      "gpu": [
+        5,
+        6
+      ],
+      "window_name": "stage3-exp168",
+      "baseline_default_gpu": 5,
+      "per_rank_batch_size": 2,
+      "launch_world_size": 2,
+      "launch_mode": "packed_batch_equivalent",
+      "launch_wave": 0
+    },
+    "user-ltv": {
+      "target": "lab25211",
+      "gpu": 5,
+      "window_name": "stage3-exp169",
+      "baseline_default_gpu": 6,
+      "per_rank_batch_size": 2,
+      "launch_world_size": 1,
+      "launch_mode": "packed_batch_equivalent",
+      "launch_wave": 1
+    },
+    "item-incoterms": {
+      "target": "lab25211",
+      "gpu": [
+        6,
+        7
+      ],
+      "window_name": "stage3-exp170",
+      "baseline_default_gpu": 7,
+      "per_rank_batch_size": 2,
+      "launch_world_size": 2,
+      "launch_mode": "packed_batch_equivalent",
+      "launch_wave": 1
+    }
+  }
+}

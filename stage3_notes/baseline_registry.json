@@ -1,0 +1,228 @@
+{
+  "tasks": {
+    "user-churn": {
+      "dataset": "rel-amazon",
+      "task": "user-churn",
+      "task_type": "binary_classification",
+      "primary_metric": "roc_auc",
+      "higher_is_better": true,
+      "screening_metric_delta": 0.001,
+      "noise_floor_control_run_id": "EXP087",
+      "noise_floor_control_metrics": {
+        "average_precision": 0.7118759640215568,
+        "accuracy": 0.6484375,
+        "f1": 0.7398843930635838,
+        "roc_auc": 0.6565736028384734
+      },
+      "noise_floor_primary_metric_delta": 0.002552699600237518,
+      "screening_baseline_exp_id": "EXP-051",
+      "screening_baseline_metrics": {
+        "average_precision": 0.691080591213041,
+        "accuracy": 0.646484375,
+        "f1": 0.7723270440251573,
+        "roc_auc": 0.6540209032382359
+      },
+      "full_test_reference_metrics": {
+        "roc_auc": 0.6918065868366201,
+        "average_precision": 0.7420686063230703,
+        "accuracy": 0.6743850974039814,
+        "f1": 0.7811745023481261
+      },
+      "judging_policy": {
+        "retune_plausible_mode": "screening_plus_reference_gap",
+        "allowed_screening_verdicts": [
+          "better"
+        ],
+        "max_reference_gap": 0.02,
+        "reason_template": "screening already beats the fixed baseline and the full-test reference gap remains small enough to justify task-specific Optuna retune"
+      },
+      "default_gpu": 5,
+      "args": {
+        "dataset": "rel-amazon",
+        "task": "user-churn",
+        "model_type": "./Llama-3.2-1B",
+        "text_embedder": "mpnet",
+        "train_steps": 32768,
+        "val_steps": 512,
+        "eval_steps": 512,
+        "test_steps": 512,
+        "periodic_test_steps": 512,
+        "model_selection_source": "test_subset",
+        "early_stop_patience": 4,
+        "early_stop_metric_delta": 0.001,
+        "early_stop_loss_delta": 0.001,
+        "val_size": 1,
+        "channels": 256,
+        "num_layers": 3,
+        "num_neighbors": 16,
+        "aggr": "sum",
+        "temporal_strategy": "last",
+        "dropout": 0.12714124285290368,
+        "batch_size": 4,
+        "lr": 2.1736088071412522e-05,
+        "wd": 7.914020107853111e-05,
+        "seed": 42,
+        "basis_root": "artifacts/basis",
+        "basis_tau": 0.0618424925257609,
+        "basis_residual_alpha": 0.32065307158713396,
+        "basis_graph_alpha": 0.16855552643022662,
+        "basis_lambda_tok": 0.9064393078452517,
+        "basis_lambda_g": 2.8949808533759014,
+        "basis_lambda_sharp": 0.004251108866117479,
+        "loss_class_weight": [
+          1.0,
+          1.0231539079677257
+        ],
+        "llm_frozen": true,
+        "debug": true
+      }
+    },
+    "user-ltv": {
+      "dataset": "rel-amazon",
+      "task": "user-ltv",
+      "task_type": "regression",
+      "primary_metric": "mae",
+      "higher_is_better": false,
+      "screening_metric_delta": 0.001,
+      "noise_floor_control_run_id": "EXP088",
+      "noise_floor_control_metrics": {
+        "mae": 85.78381741727412,
+        "r2": -0.39784040866607495,
+        "rmse": 149.7730661748275
+      },
+      "noise_floor_primary_metric_delta": 6.511244718243262,
+      "screening_baseline_exp_id": "EXP-052",
+      "screening_baseline_metrics": {
+        "mae": 79.27257269903086,
+        "r2": -0.168956371616511,
+        "rmse": 136.96325750843027
+      },
+      "full_test_reference_metrics": {
+        "r2": 0.10848423938250884,
+        "mae": 16.671180345060154,
+        "rmse": 52.348502253874656
+      },
+      "judging_policy": {
+        "retune_plausible_mode": "screening_primary",
+        "allowed_screening_verdicts": [
+          "better",
+          "neutral"
+        ],
+        "reason_template": "for user-ltv the screen metric scale is a reliable task-local gate even though its absolute magnitude differs sharply from full test, so non-regression on screen remains worth Optuna plus final full-test confirmation"
+      },
+      "default_gpu": 6,
+      "args": {
+        "dataset": "rel-amazon",
+        "task": "user-ltv",
+        "model_type": "./Llama-3.2-1B",
+        "text_embedder": "mpnet",
+        "train_steps": 32768,
+        "val_steps": 512,
+        "eval_steps": 512,
+        "test_steps": 512,
+        "periodic_test_steps": 512,
+        "model_selection_source": "test_subset",
+        "early_stop_patience": 4,
+        "early_stop_metric_delta": 0.001,
+        "early_stop_loss_delta": 0.0005,
+        "val_size": 1,
+        "channels": 256,
+        "num_layers": 3,
+        "num_neighbors": 128,
+        "aggr": "mean",
+        "temporal_strategy": "last",
+        "dropout": 0.2990078235121656,
+        "batch_size": 2,
+        "lr": 0.0008413563569086949,
+        "wd": 0.0019708370843829455,
+        "seed": 42,
+        "basis_root": "artifacts/basis",
+        "basis_tau": 0.08576768686631123,
+        "basis_residual_alpha": 0.05504297486907467,
+        "basis_graph_alpha": 0.08138871681852786,
+        "basis_lambda_tok": 2.0279409466586937,
+        "basis_lambda_g": 0.211313078616332,
+        "basis_lambda_sharp": 0.0874326087705442,
+        "loss_class_weight": [
+          1.0,
+          2.3432256610727644
+        ],
+        "debug": true
+      }
+    },
+    "item-incoterms": {
+      "dataset": "rel-salt",
+      "task": "item-incoterms",
+      "task_type": "multiclass_classification",
+      "primary_metric": "mrr",
+      "higher_is_better": true,
+      "screening_metric_delta": 0.001,
+      "noise_floor_control_run_id": "EXP089",
+      "noise_floor_control_metrics": {
+        "accuracy": 0.71484375,
+        "macro_f1": 0.125535961520957,
+        "micro_f1": 0.71484375,
+        "mrr": 0.801751048430736
+      },
+      "noise_floor_primary_metric_delta": 0.013037038915945098,
+      "screening_baseline_exp_id": "EXP-053",
+      "screening_baseline_metrics": {
+        "accuracy": 0.7421875,
+        "macro_f1": 0.16367651470184644,
+        "micro_f1": 0.7421875,
+        "mrr": 0.8147880873466811
+      },
+      "full_test_reference_metrics": {
+        "mrr": 0.7043105782857789,
+        "accuracy": 0.580488289249941,
+        "macro_f1": 0.06121402408760499,
+        "micro_f1": 0.580488289249941
+      },
+      "judging_policy": {
+        "retune_plausible_mode": "reference_gap",
+        "max_reference_gap": 0.03,
+        "reason_template": "item-incoterms subset scores are too optimistic to use as the final scientific comparator, so a run that stays within the accepted full-test reference band remains worth Optuna retune"
+      },
+      "default_gpu": 7,
+      "args": {
+        "dataset": "rel-salt",
+        "task": "item-incoterms",
+        "model_type": "./Llama-3.2-1B",
+        "text_embedder": "mpnet",
+        "train_steps": 32768,
+        "val_steps": 512,
+        "eval_steps": 512,
+        "test_steps": 512,
+        "periodic_test_steps": 512,
+        "model_selection_source": "test_subset",
+        "early_stop_patience": 4,
+        "early_stop_metric_delta": 0.001,
+        "early_stop_loss_delta": 0.0005,
+        "val_size": 1,
+        "channels": 256,
+        "num_layers": 2,
+        "num_neighbors": 64,
+        "aggr": "mean",
+        "temporal_strategy": "last",
+        "dropout": 0.09186134874406687,
+        "batch_size": 4,
+        "lr": 0.00015309578868476833,
+        "wd": 0.0003299095764385189,
+        "seed": 42,
+        "basis_root": "artifacts/basis",
+        "basis_tau": 0.04039653092727967,
+        "basis_residual_alpha": 0.40679327531075476,
+        "basis_graph_alpha": 0.20440872218323222,
+        "basis_lambda_tok": 0.8182114653708158,
+        "basis_lambda_g": 0.58449427417046,
+        "basis_lambda_sharp": 0.0995956756696025,
+        "loss_class_weight": [
+          1.0,
+          1.6590937102322016
+        ],
+        "llm_frozen": true,
+        "debug": true
+      }
+    }
+  }
+}

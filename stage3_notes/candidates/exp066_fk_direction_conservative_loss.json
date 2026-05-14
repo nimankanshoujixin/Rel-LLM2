@@ -1,0 +1,73 @@
+{
+  "bundle_id": "BUNDLE-066",
+  "slug": "fk_direction_conservative_loss",
+  "title": "FK-direction conservative loss",
+  "family": "conservative_alignment",
+  "source_type": "paper+ablation",
+  "status": "stopped",
+  "task_run_ids": {
+    "user-churn": "EXP066",
+    "user-ltv": "EXP067",
+    "item-incoterms": "EXP068"
+  },
+  "literature": {
+    "queries": [
+      "graph prompt alignment direction preservation foreign key role asymmetry llm",
+      "reconstructive graph token alignment conservative role-aware relation direction supervision"
+    ],
+    "papers": [
+      {
+        "title": "Can we Soft Prompt LLMs for Graph Learning Tasks?",
+        "url": "https://arxiv.org/abs/2402.10359",
+        "claim": "The central bottleneck is graph-text alignment quality rather than prompt wording, so structural invariants should be enforced where graph states are projected into prompt space.",
+        "relevance": "Supports targeting token-query alignment with a local conservative penalty instead of another prompt-side or coefficient-only scan.",
+        "status": "selected"
+      },
+      {
+        "title": "Toward Graph-Tokenizing Large Language Models with Reconstructive Graph Instruction Tuning",
+        "url": "https://arxiv.org/abs/2603.01385",
+        "claim": "Explicit graph-side supervision improves alignment, but stronger global reconstruction can be too blunt if the useful invariant is more local than whole-graph recovery.",
+        "relevance": "Supports replacing graph-global pressure with a narrower direction-preservation objective at the token-query alignment layer.",
+        "status": "selected"
+      },
+      {
+        "title": "Graph-Aware Language Model Pre-Training on a Large Graph Corpus Can Help Multiple Graph Applications",
+        "url": "https://arxiv.org/abs/2306.02592",
+        "claim": "Graph-aware supervisory signals can improve cross-task transfer when the auxiliary objective preserves structurally meaningful graph information.",
+        "relevance": "Supports testing a structure-preserving finetune auxiliary loss that is narrower and safer than the blocked pretrain path.",
+        "status": "selected"
+      }
+    ]
+  },
+  "evidence": {
+    "prior_experiments": [
+      "EXP054",
+      "EXP060",
+      "EXP063"
+    ],
+    "why_now": "EXP060 and EXP063 showed that stronger local alignment pressure can help user-churn, but graph-global reconstruction still regresses user-ltv and item-incoterms. The next lower-risk branch is therefore a more local conservative loss that preserves source-vs-target role asymmetry along foreign-key routes without introducing graph-global pressure."
+  },
+  "hypothesis": "Current basis BCE and reconstruction losses can still blur source-vs-target role information because both sides of an FK route are optimized mainly toward shared pair-level semantics. Adding a modest token-query penalty when FK-source and FK-target alignment states collapse toward high cosine similarity should preserve join-role readability, retain the recent classification-side gains from stronger alignment, and reduce the regression and salt-side damage caused by graph-global reconstruction.",
+  "common_overrides": {
+    "basis_lambda_fk_dir": 0.1,
+    "basis_fk_dir_margin": 0.35
+  },
+  "task_gpus": {
+    "user-churn": 0,
+    "user-ltv": 5,
+    "item-incoterms": 6
+  },
+  "task_overrides": {
+    "user-churn": {},
+    "user-ltv": {},
+    "item-incoterms": {}
+  },
+  "notes": [
+    "This is a finetune-only route-aware conservative loss candidate; do not use pretrain or --pretrain.",
+    "Implementation scope is intentionally isolated: add only one FK-direction conservative term on top of the refreshed 512-step screening baseline.",
+    "Chosen GPUs reflect the currently idle set observed from the local orchestrator on 2026-05-07; do not restore the old fixed 5/6/7 rule.",
+    "Launched on 2026-05-07 after syncing the current main.py/model.py candidate patch plus generated wrappers and launcher to the remote repo and /tmp.",
+    "Completed on 2026-05-07 with global verdict: failed.",
+    "user-churn improved, but user-ltv and item-incoterms both regressed against the refreshed 512-step strict baselines."
+  ]
+}

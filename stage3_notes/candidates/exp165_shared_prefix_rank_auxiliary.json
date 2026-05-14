@@ -1,0 +1,109 @@
+{
+  "bundle_id": "BUNDLE-165",
+  "slug": "shared_prefix_rank_auxiliary",
+  "title": "Shared-prefix scorer with hard-negative rank auxiliary",
+  "family": "label_interface",
+  "source_type": "ablation",
+  "launch_mode": "packed_batch_equivalent",
+  "status": "failed",
+  "gpu_exclude": [
+    0
+  ],
+  "task_cost_weights": {
+    "user-churn": 1.0,
+    "user-ltv": 1.2,
+    "item-incoterms": 2.5
+  },
+  "task_run_ids": {
+    "user-churn": "EXP165",
+    "user-ltv": "EXP166",
+    "item-incoterms": "EXP167"
+  },
+  "literature": {
+    "queries": [
+      "shared prefix candidate scoring multiclass language model label ranking",
+      "hard negative ranking loss candidate scorer MRR"
+    ],
+    "papers": [
+      {
+        "title": "",
+        "url": "",
+        "claim": "",
+        "relevance": "",
+        "status": "not_required_for_ablation"
+      }
+    ]
+  },
+  "evidence": {
+    "prior_experiments": [
+      "EXP108",
+      "EXP126",
+      "EXP159",
+      "EXP162"
+    ],
+    "why_now": "EXP108 showed that the scalable shared-prefix scorer preserved item-incoterms near the strict baseline, but did not become a promotable bundle. EXP162 showed that hard-negative ranking pressure improves the default scorer's salt-side MRR band but remains clearly below baseline. EXP126 showed that autoregressive shortlist reranking is too expensive. The next justified candidate is therefore to combine the strongest scalable candidate-token information path from EXP108 with the direct MRR-aligned hard-negative supervision from EXP162."
+  },
+  "hypothesis": "If hard-negative rank pressure is directionally useful but the default scorer lacks enough candidate-token information, then applying the same margin-free hard-negative auxiliary to the scalable shared-prefix candidate-token scorer should preserve the near-baseline salt-side signal from EXP108 while giving the true candidate stronger pressure over the hardest wrong candidate. This remains finetune-only, candidate-aware, non-autoregressive, and avoids exhaustive O(L*C) rollout.",
+  "common_overrides": {
+    "autocomplete_decision_interface": "candidate_pairwise_shared_prefix_hybrid",
+    "autocomplete_rank_auxiliary": true
+  },
+  "task_overrides": {
+    "user-churn": {},
+    "user-ltv": {},
+    "item-incoterms": {}
+  },
+  "notes": [
+    "Keep Stage 3 finetune-only; do not use --pretrain.",
+    "This candidate is not a token-stats, pooled-label, or residual-strength variant.",
+    "It combines two prior-ablation signals: EXP108's scalable shared-prefix candidate-token scorer and EXP162's direct hard-negative ranking pressure.",
+    "The hard-negative auxiliary is active only for autocomplete multiclass; user-churn and user-ltv remain no-op drift controls.",
+    "Exclude GPU0 for this candidate only because EXP162 showed a current pre-eval SIGTERM when user-churn used GPU0 as local_rank 0; pipeline_config keeps gpu_exclude empty globally.",
+    "Launched on 2026-05-09 through the local Stage 3 launcher.",
+    "Resolved packed batch-equivalent placement at launch time: user-churn -> lab25211 GPUs 5,6 with per-rank batch 2 in wave 0; user-ltv -> lab25211 GPU 5 with per-rank batch 2 in wave 1; item-incoterms -> lab25211 GPUs 6,7 with per-rank batch 2 in wave 1.",
+    "First post-launch status check showed EXP165 window up in DB-load startup; EXP166 and EXP167 are correctly waiting for wave 1; orchestrator recommendation: keep_watching.",
+    "Completed on 2026-05-10 with global verdict: failed.",
+    "Result under replay-aware effective deltas: user-churn better, user-ltv neutral, item-incoterms worse.",
+    "EXP167 item-incoterms was manually killed after the 4096-step evaluation because it was the only remaining active task, throughput was about 1.26 train steps/sec on GPUs 6,7 with a projected 6+ hours remaining, and best MRR was still clearly below baseline.",
+    "Throughput conclusion: despite being non-O(L*C) in intent, the shared-prefix scorer is not acceptable for routine Stage 3 screening in its current implementation.",
+    "Scientific conclusion: adding the hard-negative ranking auxiliary to the shared-prefix scorer did not preserve the near-baseline EXP108 salt-side behavior."
+  ],
+  "task_launches": {
+    "user-churn": {
+      "target": "lab25211",
+      "gpu": [
+        5,
+        6
+      ],
+      "window_name": "stage3-exp165",
+      "baseline_default_gpu": 5,
+      "per_rank_batch_size": 2,
+      "launch_world_size": 2,
+      "launch_mode": "packed_batch_equivalent",
+      "launch_wave": 0
+    },
+    "user-ltv": {
+      "target": "lab25211",
+      "gpu": 5,
+      "window_name": "stage3-exp166",
+      "baseline_default_gpu": 6,
+      "per_rank_batch_size": 2,
+      "launch_world_size": 1,
+      "launch_mode": "packed_batch_equivalent",
+      "launch_wave": 1
+    },
+    "item-incoterms": {
+      "target": "lab25211",
+      "gpu": [
+        6,
+        7
+      ],
+      "window_name": "stage3-exp167",
+      "baseline_default_gpu": 7,
+      "per_rank_batch_size": 2,
+      "launch_world_size": 2,
+      "launch_mode": "packed_batch_equivalent",
+      "launch_wave": 1
+    }
+  }
+}

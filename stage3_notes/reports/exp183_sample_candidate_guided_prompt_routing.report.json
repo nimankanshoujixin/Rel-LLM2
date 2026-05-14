@@ -1,0 +1,65 @@
+{
+  "candidate": "stage3_notes\\candidates\\exp183_sample_candidate_guided_prompt_routing.json",
+  "tasks": {
+    "user-churn": {
+      "run_id": "EXP183",
+      "log_path": "G:\\RelLLM-2\\Rel-LLM\\stage3_notes\\reports\\log_cache\\stage3-exp183.log",
+      "metrics": {
+        "average_precision": 0.6961670548868191,
+        "accuracy": 0.66015625,
+        "f1": 0.7563025210084033,
+        "roc_auc": 0.6877176117513276
+      },
+      "comparison": {
+        "primary_metric": "roc_auc",
+        "current": 0.6877176117513276,
+        "baseline": 0.6540209032382359,
+        "signed_gain": 0.0336967085130917,
+        "delta_threshold": 0.001,
+        "noise_floor_delta": 0.002552699600237518,
+        "effective_delta_threshold": 0.002552699600237518,
+        "verdict": "better"
+      }
+    },
+    "user-ltv": {
+      "run_id": "EXP184",
+      "log_path": "G:\\RelLLM-2\\Rel-LLM\\stage3_notes\\reports\\log_cache\\stage3-exp184.log",
+      "metrics": {
+        "r2": -0.1286743092048419,
+        "mae": 79.40659794325009,
+        "rmse": 149.98305789663073
+      },
+      "comparison": {
+        "primary_metric": "mae",
+        "current": 79.40659794325009,
+        "baseline": 79.27257269903086,
+        "signed_gain": -0.1340252442192309,
+        "delta_threshold": 0.001,
+        "noise_floor_delta": 6.511244718243262,
+        "effective_delta_threshold": 6.511244718243262,
+        "verdict": "neutral"
+      }
+    },
+    "item-incoterms": {
+      "run_id": "EXP185",
+      "log_path": "G:\\RelLLM-2\\Rel-LLM\\stage3_notes\\reports\\log_cache\\stage3-exp185.log",
+      "metrics": {
+        "accuracy": 0.560546875,
+        "macro_f1": 0.0718397997496871,
+        "micro_f1": 0.560546875,
+        "mrr": 0.6782075427827381
+      },
+      "comparison": {
+        "primary_metric": "mrr",
+        "current": 0.6782075427827381,
+        "baseline": 0.8147880873466811,
+        "signed_gain": -0.13658054456394297,
+        "delta_threshold": 0.001,
+        "noise_floor_delta": 0.013037038915945098,
+        "effective_delta_threshold": 0.013037038915945098,
+        "verdict": "worse"
+      }
+    }
+  },
+  "global_verdict": "failed"
+}
