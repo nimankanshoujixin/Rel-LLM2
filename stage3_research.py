@@ -1630,6 +1630,11 @@ def build_parser() -> argparse.ArgumentParser:
     launch.add_argument("candidate", type=Path)
     launch.add_argument("--allow-no-papers", action="store_true")
     launch.add_argument("--dry-run", action="store_true")
+    launch.add_argument(
+        "--skip-sync",
+        action="store_true",
+        help="Assume the remote run root is already on the desired pushed branch tip and skip SCP runtime file sync.",
+    )
 
     parse = subparsers.add_parser("parse-log", help="Parse one stage3 log file.")
     parse.add_argument("log", type=Path)
@@ -1673,7 +1678,8 @@ def main() -> None:
         print_rendered(rendered)
         if args.dry_run:
             return
-        sync_runtime_files_to_targets(rendered, config)
+        if not args.skip_sync:
+            sync_runtime_files_to_targets(rendered, config)
         launch_rendered_candidate(rendered, config)
         write_task_launches(args.candidate, launches)
         print("Launch completed.")

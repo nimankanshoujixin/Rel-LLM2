@@ -131,3 +131,59 @@ So the next bundle should narrow the mechanism rather than replace it:
 
 That follow-up is the right next test because it still probes the same Part 3 causal story,
 but avoids turning the search into manual broad hyperparameter scanning.
+
+## Second narrowed follow-up outcome
+
+The second screening-only narrowed follow-up has now completed as:
+
+- `EXP198` / `user-churn`
+- `EXP199` / `user-ltv`
+- `EXP200` / `item-incoterms`
+
+Outcome summary:
+
+- official report:
+  - `stage3_notes/reports/exp198_constraint_conservation_gated_amazon_transfer.report.json`
+- bundle verdict:
+  - `failed`
+- candidate status:
+  - `retune_plausible`
+- task reading:
+  - `user-churn`
+    - final judged test metric `roc_auc=0.6333745404337985`
+    - still worse than the screening baseline and worse than the full-test reference
+    - this improved only slightly over `EXP195`, so Amazon-side harm was reduced only marginally
+  - `user-ltv`
+    - final judged test metric `mae=82.44562131792307`
+    - versus the screening baseline it moved from `worse` in `EXP196` to `neutral`
+    - this is evidence that narrower Amazon transfer was directionally helpful, but still not
+      enough to treat the bundle as promotable
+  - `item-incoterms`
+    - final judged test metric `mrr=0.7937578209550865`
+    - still below the optimistic screening baseline `0.8147880873466811`
+    - but again clearly above the stored full-test reference `0.7043105782857789`
+
+Program consequence:
+
+- `EXP198` should not advance as a full bundle to Optuna or final full test
+- the Part 3 family is still not retired, because the salt-side continuation signal remains strong
+  and the Amazon-side narrowing did improve `user-ltv`
+- the most plausible remaining issue is now that the Amazon tasks are still over-constrained by the
+  new conservation losses themselves, not only by residual transfer amplitude
+
+## Third narrower follow-up
+
+The next justified screening step should therefore isolate conservative transfer from the newer
+Amazon-side conservation penalties:
+
+- keep the validated Part 1 base unchanged
+- keep the stronger salt-side transfer path unchanged
+- keep Amazon-side confidence gating, but raise the gate floors further
+- reduce Amazon-side residual/graph injection further
+- set Amazon-side `basis_lambda_postalign_tok=0`
+- set Amazon-side `basis_lambda_entity_identity=0`
+- keep Amazon-side `basis_lambda_branch_orth=0`
+
+That next follow-up is the cleanest causal split now available because it asks whether the useful
+signal is "gated transfer only" rather than "gated transfer plus added conservation losses" on the
+Amazon tasks.

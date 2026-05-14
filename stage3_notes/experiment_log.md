@@ -984,6 +984,114 @@
     task-sensitive transfer conservatism rather than wholesale retirement
   - if it fails again, the next move should likely be a deeper mechanism split rather than manual
     hyperparameter poking
+- Launch status:
+  - committed and pushed as branch tip `fe603ab`
+  - launched from the clean worktree with:
+    `python stage3_research.py launch stage3_notes/candidates/exp198_constraint_conservation_gated_amazon_transfer.json --allow-no-papers`
+  - resolved real-time placement from the current idle GPUs:
+    - `EXP198` / `user-churn`: target `lab25211`, GPU `0`
+    - `EXP199` / `user-ltv`: target `lab25211`, GPU `1`
+    - `EXP200` / `item-incoterms`: target `lab25211`, GPU `2`
+  - remote safety rule preserved:
+    - launch root is still the safe clean remote root
+      `/fs/fast/u2021201693/lym/Rel-LLM-codex-stage3-clean-p13`
+    - no launch was sent back to the old dirty remote repo root
+- First post-launch status check:
+  - remote tmux session `lymtmux` now contains windows:
+    - `stage3-exp198`
+    - `stage3-exp199`
+    - `stage3-exp200`
+  - live process table confirms all three `main.py` runs are present with the intended narrowed
+    Amazon-side gating flags and the intended stronger salt-side path
+  - `/tmp/stage3-exp198.log`, `/tmp/stage3-exp199.log`, and `/tmp/stage3-exp200.log` had not yet
+    emitted useful tail lines at the first sample, so the bundle appears to be in early startup /
+    loading rather than stalled-complete
+- Immediate next action:
+  - continue short-interval monitoring until the first eval or startup diagnostics appear
+  - if logs stay empty abnormally or any process dies, inspect the real remote logs and continue
+    foreground patch / rerun instead of waiting for heartbeat only
+- Completion update later on 2026-05-15:
+  - `EXP198`, `EXP199`, and `EXP200` all finished cleanly
+  - remote tmux session `lymtmux` returned to only `0:bash`
+  - local GPUs `0-3` on `lab25211` returned idle, while GPUs `4-7` remained occupied by
+    unrelated service load and should still not be assumed available
+  - remote process re-check found no live `main.py`, `torch.distributed.run`, or
+    `tune_hyperparameters.py` chain for this bundle
+  - synced artifacts now include:
+    - official report
+      `stage3_notes/reports/exp198_constraint_conservation_gated_amazon_transfer.report.json`
+    - local log cache:
+      - `stage3_notes/reports/log_cache/stage3-exp198.log`
+      - `stage3_notes/reports/log_cache/stage3-exp199.log`
+      - `stage3_notes/reports/log_cache/stage3-exp200.log`
+- Final subset metrics and throughput summary:
+  - `EXP198` / `user-churn`
+    - best test subset / final judged test `roc_auc=0.6333745404337985`
+    - visible test throughput stayed around `26.5` batches/sec on one GPU
+    - with per-rank `batch_size=3`, about `79.5` items/sec/GPU
+  - `EXP199` / `user-ltv`
+    - best test subset / final judged test `mae=82.44562131792307`
+    - visible test throughput stayed around `22.4` batches/sec on one GPU
+    - with per-rank `batch_size=2`, about `44.8` items/sec/GPU
+  - `EXP200` / `item-incoterms`
+    - best test subset / final judged test `mrr=0.7937578209550865`
+    - visible test throughput stayed around `17.6` batches/sec on one GPU
+    - with per-rank `batch_size=4`, about `70.4` items/sec/GPU
+- Final bundle decision:
+  - official report `stage3_notes/reports/exp198_constraint_conservation_gated_amazon_transfer.report.json`
+    marked the bundle `global_verdict=failed` and `candidate_status=retune_plausible`
+  - the narrowed Amazon-gated Part 3 bundle therefore still does **not** justify immediate Optuna
+    or final full-test continuation as a bundle
+- Scientific interpretation:
+  - `user-churn` stayed clearly below both the screening baseline and the stored full-test
+    reference, so the bundle still fails as a representative-set continuation
+  - `user-ltv` improved relative to `EXP196`: it moved from screening `worse` to screening
+    `neutral`, which is evidence that narrowing Amazon-side transfer was directionally helpful even
+    though it is still not enough to promote the bundle
+  - `item-incoterms` again stayed below the optimistic subset baseline but clearly above the
+    stored full-test reference band, so the salt-side mechanism signal remains real-looking and
+    should not be dropped mechanically
+- Next concrete blocker:
+  - do not launch Optuna for the exact `EXP198` bundle
+  - use the completed evidence to design a stricter Amazon `gate-only` follow-up that keeps the
+    validated salt-side path but disables almost all new Amazon-side conservation penalties
+    themselves before spending any Optuna budget
+
+### EXP-201 / EXP-202 / EXP-203
+
+- Date: 2026-05-15
+- Branch: `codex/stage3-clean-p13`
+- Target component: stricter Amazon gate-only Part 3 follow-up
+- Evidence basis:
+  - `EXP198/199/200` showed that narrower Amazon-side transfer improved `user-ltv` from worse to
+    neutral, but did not rescue `user-churn`
+  - that pattern suggests the remaining Amazon regression may be coming from the extra
+    conservation losses still coupled onto the Amazon tasks rather than from conservative gated
+    transfer itself
+- Change summary:
+  - register candidate
+    `stage3_notes/candidates/exp201_constraint_conservation_amazon_gate_only.json`
+  - keep the validated Part 1 artifact-backed base and the same Phase 2 task-specific best
+    hyperparameters for fair comparison
+  - keep the strong salt-side path unchanged
+  - narrow the Amazon-side path further:
+    - keep `basis_gate_strategy=confidence`
+    - raise Amazon-side `basis_gate_token_floor` and `basis_gate_graph_floor`
+    - reduce Amazon-side `basis_residual_alpha` and disable Amazon-side graph residual
+    - set Amazon-side `basis_lambda_postalign_tok=0`
+    - set Amazon-side `basis_lambda_entity_identity=0`
+    - keep Amazon-side `basis_lambda_branch_orth=0`
+- Launch blocker discovered before relaunch:
+  - the safe remote run root on `lab25211`,
+    `/fs/fast/u2021201693/lym/Rel-LLM-codex-stage3-clean-p13`, is no longer fully clean
+  - remote branch tip is still `181f08e`, while local/pushed tip is `fe603ab`
+  - remote `model.py` has a tracked modification that is effectively the same graph-residual fix
+    later committed locally, so the next launch must first restore the safe run root to a true
+    pull-safe branch state rather than overwriting it with ad-hoc sync
+- Immediate next action:
+  - use a branch-based safe remote update path, not raw overwrite into the dirty root
+  - after the remote safe root is back on a clean pulled branch tip, launch `EXP201/202/203`
+    as screening-only from the clean worktree
 
 ### EXP-177 / EXP-178 / EXP-179
 
