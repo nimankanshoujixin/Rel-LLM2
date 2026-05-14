@@ -11,6 +11,11 @@
     "user-ltv": "EXP196",
     "item-incoterms": "EXP197"
   },
+  "task_gpus": {
+    "user-churn": 0,
+    "user-ltv": 1,
+    "item-incoterms": 2
+  },
   "literature": {
     "queries": [
       "graph contrastive learning preserve node identity across transformed views",
