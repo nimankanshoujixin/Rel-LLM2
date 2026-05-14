@@ -204,6 +204,23 @@
   - retarget heartbeat automation from Phase 2 monitoring to the next concrete follow-up blocker,
     such as Part 3 candidate selection, static validation, or launch preparation
 
+## EXP192 concrete Part 3 blocker narrowed
+
+- Date: 2026-05-15
+- Narrowed blocker:
+  - the next EXP192-family step should no longer be described only as generic Part 3 continuation
+  - the concrete blocker should stay aligned with the planned Part 3 direction:
+    implement the constraint-conservation layer on top of the validated Part 1 base
+- Why this blocker is preferred:
+  - the Stage 3 tuning-space docs already define the pipeline as
+    `图编码表示 -> 对齐到数据库条件化语义基底 -> 受约束守恒迁移 -> 压缩成 graph tokens -> 注入冻结 LLM`
+  - Phase 2 is sufficient to treat Part 1 as implemented and validation-backed, so the right next
+    move is to advance into the documented constraint-conservation layer rather than inserting a
+    new attribution detour
+- Preparation rule:
+  - first persist the Part 3 constraint-conservation candidate story and static gate
+  - only after that should the next launch decision be made
+
 ## Screening Protocol Update
 
 - Date: 2026-05-05

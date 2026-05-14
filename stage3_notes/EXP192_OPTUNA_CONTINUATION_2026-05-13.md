@@ -126,3 +126,31 @@ Required next-step handling:
 - commit that baseline before starting any Part 3-specific follow-up work
 - retarget heartbeat automation from final-test monitoring to the next concrete Part 3 blocker,
   such as candidate selection, static validation, or launch preparation
+
+## Concrete Part 3 blocker after Phase 2
+
+The next blocker should now be treated more narrowly than a generic "continue Part 3" instruction.
+
+Correct concrete blocker:
+
+- continue with the documented Part 3 direction: implement the constraint-conservation layer
+  rather than retargeting Part 3 into a separate Goal B attribution exercise
+- use the current validated Part 1 state as the base for that work, exactly as the transition rule
+  intended
+
+Why this is the right next blocker:
+
+- the documented Stage 3 pipeline view already places Part 3 at the
+  `受约束守恒迁移 / constraint-conservation transfer` layer
+- Phase 2 gave enough evidence that Part 1 is implemented and validation-backed, so the next step
+  is to move forward into the planned constraint-conservation implementation path
+- this still preserves the mixed Phase 2 reading: the family is promising enough to continue, but
+  not yet a representative-set winner
+
+Required handling for this blocker:
+
+- keep the current `gnn_repr_artifact` path and validated Part 1 state as the base
+- write or refine the Part 3 candidate/spec around constraint conservation, not around a new
+  user-churn-specific attribution detour
+- keep Optuna and final-test confirmation as separate later phases after the Part 3 implementation
+  step is ready
