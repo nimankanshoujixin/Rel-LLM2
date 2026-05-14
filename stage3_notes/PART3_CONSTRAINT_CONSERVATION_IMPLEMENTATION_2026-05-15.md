@@ -187,3 +187,71 @@ Amazon-side conservation penalties:
 That next follow-up is the cleanest causal split now available because it asks whether the useful
 signal is "gated transfer only" rather than "gated transfer plus added conservation losses" on the
 Amazon tasks.
+
+## Fourth narrower follow-up outcome
+
+The stricter Amazon gate-only follow-up has now completed as:
+
+- `EXP201` / `user-churn`
+- `EXP202` / `user-ltv`
+- `EXP203` / `item-incoterms`
+
+Outcome summary:
+
+- official report:
+  - `stage3_notes/reports/exp201_constraint_conservation_amazon_gate_only.report.json`
+- bundle verdict:
+  - `failed`
+- candidate status:
+  - `retune_plausible`
+- throughput reading from the finished logs:
+  - `EXP201` / `user-churn`
+    - visible `TestSubset` throughput about `27.2-27.5 it/s`
+    - with per-rank `batch_size=3` on one GPU, about `81.6-82.5 items/sec/GPU`
+  - `EXP202` / `user-ltv`
+    - visible subset throughput about `22.x it/s`
+    - with per-rank `batch_size=2` on one GPU, about `44.x items/sec/GPU`
+  - `EXP203` / `item-incoterms`
+    - visible subset/test throughput about `18.2-18.4 it/s`
+    - with per-rank `batch_size=4` on one GPU, about `72.8-73.6 items/sec/GPU`
+- task reading:
+  - `user-churn`
+    - final judged test metric `roc_auc=0.6538282466646332`
+    - this improved from clearly `worse` in `EXP198` to screening `neutral`
+    - but it is still below the stored full-test reference `0.6918065868366201`
+  - `user-ltv`
+    - final judged test metric `mae=82.00923457345925`
+    - this stayed screening `neutral`, slightly better than `EXP198`
+    - but it still does not become a promotable bundle-level Amazon win
+  - `item-incoterms`
+    - final judged test metric `mrr=0.7937755766369047`
+    - again below the optimistic screening baseline `0.8147880873466811`
+    - but again clearly above the stored full-test reference `0.7043105782857789`
+
+Program consequence:
+
+- `EXP201` should not advance as a full bundle to Optuna or final full test
+- the new evidence is still useful: removing Amazon-side conservation penalties fixed most of the
+  extra Amazon harm introduced by `EXP195`, but did not convert Amazon transfer into a clear win
+- that shifts the most plausible remaining explanation:
+  - the salt-side Part 3 path still looks useful
+  - the remaining Amazon regression now looks more likely to come from Amazon-side transfer itself,
+    not from the already-removed Amazon-side conservation losses
+
+## Next causal control
+
+The next justified screening step is therefore a stricter task-selective control:
+
+- keep the validated Part 1 base unchanged
+- keep the stronger salt-side Part 3 path unchanged
+- disable Amazon-side residual transfer entirely:
+  - `basis_residual_alpha=0`
+  - `basis_graph_alpha=0`
+  - `basis_gate_strategy=none`
+  - `basis_lambda_postalign_tok=0`
+  - `basis_lambda_entity_identity=0`
+  - `basis_lambda_branch_orth=0`
+
+That follow-up is now the cleanest continuation because it asks a sharper question than `EXP201`:
+is Part 3 actually only worth enabling on the salt-side representative task, while Amazon should
+stay on the validated Part 1 base?

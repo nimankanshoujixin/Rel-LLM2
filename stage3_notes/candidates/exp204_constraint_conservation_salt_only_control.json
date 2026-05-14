@@ -1,21 +1,21 @@
 {
-  "bundle_id": "BUNDLE-201",
-  "slug": "constraint_conservation_amazon_gate_only",
-  "title": "Constraint conservation Amazon gate-only follow-up",
+  "bundle_id": "BUNDLE-204",
+  "slug": "constraint_conservation_salt_only_control",
+  "title": "Constraint conservation salt-only control",
   "family": "representation_alignment",
   "source_type": "ablation",
   "launch_mode": "parallel",
-  "status": "retune_plausible",
+  "status": "planned",
   "task_run_ids": {
-    "user-churn": "EXP201",
-    "user-ltv": "EXP202",
-    "item-incoterms": "EXP203"
+    "user-churn": "EXP204",
+    "user-ltv": "EXP205",
+    "item-incoterms": "EXP206"
   },
   "literature": {
     "queries": [
-      "confidence gated graph transfer negative transfer conservative prompt alignment",
-      "selective graph-to-token transfer reduce negative transfer domain-specific gating",
-      "graph representation transfer conservative residual injection confidence threshold"
+      "task selective graph transfer negative transfer disable source path ablation",
+      "domain selective prompt transfer conservative graph alignment control ablation",
+      "when to disable transfer branch to avoid negative transfer structured representation alignment"
     ],
     "papers": []
   },
@@ -29,11 +29,14 @@
       "EXP197",
       "EXP198",
       "EXP199",
-      "EXP200"
+      "EXP200",
+      "EXP201",
+      "EXP202",
+      "EXP203"
     ],
-    "why_now": "EXP198 narrowed Amazon-side transfer and improved user-ltv from worse to neutral, but user-churn still failed clearly while item-incoterms again preserved strong salt-side signal. The next justified follow-up is therefore to separate conservative gated transfer from the newer Amazon-side conservation losses themselves: keep the validated Part 1 base and strong salt-side path, but shrink Amazon-side post-alignment and identity regularization almost to zero before spending Optuna budget."
+    "why_now": "EXP201 removed the new Amazon-side conservation penalties and pulled both Amazon tasks back to screening-neutral while preserving the strong salt-side continuation signal, but it still did not create positive Amazon evidence. The next justified causal control is therefore to test whether the remaining Amazon harm comes from any Amazon-side transfer at all: keep the validated Part 1 base on Amazon, keep the stronger salt-side Part 3 path unchanged, and measure whether task-selective enablement is the cleaner continuation."
   },
-  "hypothesis": "If the remaining Amazon regression after EXP198 comes less from gated residual mixing itself and more from the extra constraint-conservation penalties still coupled onto the Amazon tasks, then keeping a stricter confidence gate while nearly disabling Amazon-side post-alignment retention and entity-identity pressure should better isolate the useful conservative-transfer effect without sacrificing the strong salt-side continuation signal.",
+  "hypothesis": "If the useful Part 3 mechanism is genuinely task-selective and the remaining Amazon regression after EXP201 comes from graph-to-token transfer itself rather than from the already-removed Amazon-side conservation losses, then disabling Amazon-side residual and graph injection entirely while preserving the strong salt-side configuration should recover the validated Amazon baseline behavior without sacrificing the salt-side gain signal.",
   "common_overrides": {
     "basis_assignment_topk": 4,
     "basis_entity_identity_temperature": 0.1
@@ -50,7 +53,7 @@
       "batch_size": 3,
       "lr": 0.00021677846214357684,
       "wd": 0.0016973078532467015,
-      "basis_residual_alpha": 0.08,
+      "basis_residual_alpha": 0.0,
       "basis_graph_alpha": 0.0,
       "basis_tau": 0.037659918741014,
       "basis_lambda_tok": 0.31528154175096096,
@@ -59,9 +62,9 @@
       "basis_lambda_postalign_tok": 0.0,
       "basis_lambda_entity_identity": 0.0,
       "basis_lambda_branch_orth": 0.0,
-      "basis_gate_strategy": "confidence",
-      "basis_gate_token_floor": 0.5,
-      "basis_gate_graph_floor": 0.85,
+      "basis_gate_strategy": "none",
+      "basis_gate_token_floor": 0.0,
+      "basis_gate_graph_floor": 0.0,
       "loss_class_weight": [
         1.0,
         1.7768682564439144
@@ -78,7 +81,7 @@
       "batch_size": 2,
       "lr": 0.0008138233922650508,
       "wd": 1.9777828512462715e-06,
-      "basis_residual_alpha": 0.05,
+      "basis_residual_alpha": 0.0,
       "basis_graph_alpha": 0.0,
       "basis_tau": 0.1160833330578411,
       "basis_lambda_tok": 1.329755409073867,
@@ -87,9 +90,9 @@
       "basis_lambda_postalign_tok": 0.0,
       "basis_lambda_entity_identity": 0.0,
       "basis_lambda_branch_orth": 0.0,
-      "basis_gate_strategy": "confidence",
-      "basis_gate_token_floor": 0.6,
-      "basis_gate_graph_floor": 0.9,
+      "basis_gate_strategy": "none",
+      "basis_gate_token_floor": 0.0,
+      "basis_gate_graph_floor": 0.0,
       "loss_class_weight": [
         1.0,
         2.7180318564408164
@@ -125,30 +128,10 @@
     }
   },
   "notes": [
-    "This is a screening-only follow-up after EXP198 remained globally failed but improved user-ltv from worse to neutral while preserving strong item-incoterms continuation signal.",
-    "The intended mechanism split is narrow: keep confidence-gated conservative transfer on Amazon, but remove almost all added Amazon-side conservation penalties so the test isolates whether the residual transfer itself is still useful.",
+    "This is a screening-only causal control after EXP201 showed that removing Amazon-side conservation penalties restores both Amazon tasks to screening-neutral without breaking the salt-side signal.",
+    "The intended split is stricter than EXP201: Amazon-side Part 3 transfer itself is disabled, while the validated salt-side Part 3 path stays unchanged.",
     "Do not run Optuna or final full test from this candidate directly.",
-    "The comparison remains fair because the validated Phase 2 per-task best hyperparameters stay fixed and only the Part 3 transfer/conservation controls are narrowed further.",
+    "The comparison remains fair because the validated Phase 2 per-task best hyperparameters stay fixed and only the task-selective Part 3 transfer enablement changes.",
     "Scientific interpretation still follows the Stage 3 task-aware rule set: user-ltv subset/full-test scale mismatch still applies, and item-incoterms should still be judged scientifically against the stored full-test reference band rather than only the optimistic subset baseline."
-  ],
-  "task_launches": {
-    "user-churn": {
-      "target": "lab25211",
-      "gpu": 3,
-      "window_name": "stage3-exp201",
-      "baseline_default_gpu": 5
-    },
-    "user-ltv": {
-      "target": "lab25211",
-      "gpu": 4,
-      "window_name": "stage3-exp202",
-      "baseline_default_gpu": 6
-    },
-    "item-incoterms": {
-      "target": "lab25211",
-      "gpu": 5,
-      "window_name": "stage3-exp203",
-      "baseline_default_gpu": 7
-    }
-  }
+  ]
 }

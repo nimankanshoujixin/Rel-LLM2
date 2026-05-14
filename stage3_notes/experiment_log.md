@@ -1093,6 +1093,69 @@
   - after the remote safe root is back on a clean pulled branch tip, launch `EXP201/202/203`
     as screening-only from the clean worktree
 
+### EXP-201 / EXP-202 / EXP-203 completion
+
+- Date: 2026-05-15
+- Branch: `codex/stage3-clean-p13`
+- Target component: stricter Amazon gate-only Part 3 follow-up
+- Completion state re-check:
+  - remote tmux session `lymtmux` is back to only `0:bash`
+  - no live `main.py`, `torch.distributed.run`, or `tune_hyperparameters.py` process chain remains
+  - all eight remote GPUs were idle at the completion check
+- Official report:
+  - `stage3_notes/reports/exp201_constraint_conservation_amazon_gate_only.report.json`
+- Bundle verdict:
+  - `failed`
+- Candidate status:
+  - `retune_plausible`
+- Throughput reading from the finished logs:
+  - `EXP201` / `user-churn`
+    - visible `TestSubset` throughput about `27.2-27.5 it/s`
+    - with per-rank `batch_size=3` on one GPU, about `81.6-82.5 items/sec/GPU`
+  - `EXP202` / `user-ltv`
+    - visible subset throughput about `22.x it/s`
+    - with per-rank `batch_size=2` on one GPU, about `44.x items/sec/GPU`
+  - `EXP203` / `item-incoterms`
+    - visible subset/test throughput about `18.2-18.4 it/s`
+    - with per-rank `batch_size=4` on one GPU, about `72.8-73.6 items/sec/GPU`
+- Final judged screening metrics:
+  - `EXP201` / `user-churn`:
+    - `average_precision=0.6951028217254132`
+    - `accuracy=0.650390625`
+    - `f1=0.737151248164464`
+    - `roc_auc=0.6538282466646332`
+  - `EXP202` / `user-ltv`:
+    - `r2=-0.24605890646550876`
+    - `mae=82.00923457345925`
+    - `rmse=141.4080756608797`
+  - `EXP203` / `item-incoterms`:
+    - `accuracy=0.69921875`
+    - `macro_f1=0.09144316730523627`
+    - `micro_f1=0.69921875`
+    - `mrr=0.7937755766369047`
+- Interpretation:
+  - `user-churn` improved materially versus `EXP198` by moving from screening `worse` to
+    screening `neutral`, but it still remains below the stored full-test reference
+    `roc_auc=0.6918065868366201`
+  - `user-ltv` stayed screening `neutral`, which keeps the task-level continuation signal alive
+    under the documented user-ltv screen/full-test mismatch rule
+  - `item-incoterms` again stayed below the optimistic subset baseline while clearly beating the
+    stored full-test reference band, so the salt-side Part 3 mechanism signal remains durable
+- Bundle-level consequence:
+  - do not run Optuna or final full test for the exact `EXP201` bundle
+  - the useful new causal read is that removing Amazon-side conservation losses fixed most of the
+    extra Amazon harm, but Amazon-side transfer itself still does not look clearly worthwhile
+- Next concrete blocker:
+  - test a stricter task-selective control rather than another partial Amazon narrowing
+  - candidate:
+    `stage3_notes/candidates/exp204_constraint_conservation_salt_only_control.json`
+  - rule:
+    - keep the validated Part 1 base on Amazon by setting Amazon-side `basis_residual_alpha=0`
+      and `basis_graph_alpha=0`
+    - keep all new Amazon-side conservation penalties disabled
+    - keep the stronger salt-side Part 3 path unchanged
+  - this remains screening-only and must not jump directly to Optuna or full test
+
 ### EXP-177 / EXP-178 / EXP-179
 
 - Date: 2026-05-11
