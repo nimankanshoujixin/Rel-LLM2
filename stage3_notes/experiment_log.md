@@ -919,10 +919,60 @@
   - `exp211` retry on GPUs `4,5` has progressed into active training instead of dying during DB
     load, so the continuation patch plus GPU-slice move cleared the immediate restart blocker
 - Next required action:
-  - keep monitoring both live studies until trial outcomes become informative
-  - if either study completes, sync `best_trial.json`, sqlite, and `/tmp/stage3-exp21x-optuna.log`
+  - `exp210` has now completed and should no longer be monitored as live
+  - keep monitoring only `exp211` until its trial outcomes become informative or the study ends
+  - if `exp211` completes, sync `best_trial.json`, sqlite, and `/tmp/stage3-exp211-optuna.log`
     immediately
-  - only after Optuna completion decide whether a separate `--final-test-only` launch is justified
+  - only after `exp211` completion decide whether a separate `--final-test-only` launch is justified
+
+## EXP210 Part 3 user-churn Optuna completion
+
+- Date: 2026-05-15
+- Branch: `codex/stage3-clean-p13`
+- Study:
+  - `exp210_user_churn_part3_hybrid_optuna_20260515t073925`
+- Remote state at completion recheck:
+  - `stage3-exp210-optuna` tmux window is gone
+  - no live `exp210` `tune_hyperparameters.py` / `torch.distributed.run` / `main.py` chain remains
+  - safe remote run root remains
+    `/fs/fast/u2021201693/lym/Rel-LLM-codex-stage3-clean-p13`
+- Synced local artifacts:
+  - `optuna_runs/exp210_user_churn_part3_hybrid_optuna_20260515t073925/best_trial.json`
+  - `optuna_runs/exp210_user_churn_part3_hybrid_optuna_20260515t073925/stage3_optuna_exp210_user_churn_part3_hybrid_20260515t073925.db`
+  - `stage3_notes/reports/log_cache/stage3-exp210-optuna-20260515.log`
+- Final Optuna outcome:
+  - sqlite state ended with one `COMPLETE` trial and the later resumed trials recorded as `FAIL`
+    rather than aborting the whole study
+  - best trial remained trial `0`
+  - best subset metric:
+    - `roc_auc=0.6752089658972344`
+  - best fixed Part 3 hybrid setting:
+    - `lr=8.468008575248323e-05`
+    - `wd=0.006351221010640704`
+    - `dropout=0.36599697090570255`
+    - `channels=256`
+    - `num_layers=2`
+    - `num_neighbors=16`
+    - `aggr=mean`
+    - `temporal_strategy=uniform`
+    - per-rank `batch_size=3`, so real global batch was `6` under 2-rank DDP
+    - `w_pos=1.0308477766956905`
+    - `basis_residual_alpha=0.13182123524319528`
+    - `basis_graph_alpha=0.045851127463358454`
+    - `basis_tau=0.05343048274530412`
+    - `basis_lambda_tok=0.5958389350068957`
+    - `basis_lambda_g=0.4345454109729476`
+    - `basis_lambda_sharp=0.0007476312062252305`
+- Scientific reading:
+  - this improved over the `EXP207` screening result
+    `roc_auc=0.6663509239488176`
+  - however, user-churn is the task where screening and final-test scales are relatively aligned
+  - the Part 3 Optuna best subset result still remains clearly below the stored user-churn
+    full-test reference `roc_auc=0.6918065868366201`
+- Decision:
+  - do **not** launch a separate `--final-test-only` run for `exp210`
+  - treat this as useful Part 3 continuation evidence, but not yet a strong enough
+    user-churn winner to spend a full-test confirmation on
 
 ## EXP204 salt-only control completion
 

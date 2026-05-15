@@ -389,3 +389,27 @@ Part 3 hybrid gate controls used by `EXP207`, especially:
 
 Without that interface support, a user-churn Part 3 Optuna launch would silently fail to reproduce
 the actual hybrid screening path.
+
+## Part 3 task-specific Optuna status update
+
+The first limited task-specific Part 3 Optuna continuation is now split into two different
+real-world states:
+
+- `exp210_user_churn_part3_hybrid_optuna_20260515t073925` has completed
+- `exp211_user_ltv_part3_hybrid_optuna_20260515t073925` is still the only live Optuna blocker
+
+Current reading for `exp210`:
+
+- best subset metric:
+  - `roc_auc=0.6752089658972344`
+- this is better than the fixed-hyperparameter `EXP207` screening result
+  `roc_auc=0.6663509239488176`
+- but it still stays below the stored user-churn full-test reference
+  `roc_auc=0.6918065868366201`
+
+Program consequence:
+
+- for user-churn, screening and full-test scales are close enough that this gap matters directly
+- so `exp210` should **not** advance to a separate `--final-test-only` confirmation
+- instead, preserve the result as evidence that the task-specific Part 3 hybrid path is more
+  plausible than the earlier coarse bundles, while keeping the live decision focus on `exp211`
