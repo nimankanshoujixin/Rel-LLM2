@@ -860,6 +860,70 @@
 - Decision:
   - running
 
+## Part 3 task-specific Optuna continuation on 2026-05-15
+
+- Date: 2026-05-15
+- Branch: `codex/stage3-clean-p13`
+- Active studies:
+  - `exp210_user_churn_part3_hybrid_optuna_20260515t073925`
+  - `exp211_user_ltv_part3_hybrid_optuna_20260515t073925`
+- Remote run root:
+  - `/fs/fast/u2021201693/lym/Rel-LLM-codex-stage3-clean-p13`
+- Purpose:
+  - continue the first limited Part 3 Amazon task-specific Optuna wave after `EXP207` reached
+    `retune_plausible`
+  - keep Optuna separate from any later final full test
+  - keep the representative Part 3 hybrid settings fixed while only retuning allowed optimization
+    knobs
+- Tuning protocol:
+  - `periodic_test_steps=512`
+  - `model_selection_source=test_subset`
+  - max `2` GPUs per Optuna task
+  - `batch_size` remains per-rank, so real global batch is `batch_size * world_size`
+- Observed launchability blocker:
+  - both studies encountered mid-trial distributed termination with only
+    `torch.distributed.elastic` `SIGTERM` / `ChildFailedError` visible in the trial logs, not a
+    clean Python model traceback
+  - first confirmed evidence:
+    - `exp211` trial `0` failed on GPUs `2,3`
+    - local synced blocker log:
+      `stage3_notes/reports/log_cache/optuna_blockers/stage3-exp211-optuna-initial-failure-20260515.log`
+  - later evidence showed the same failure shape also hit `exp210` trial `1`, so the blocker is
+    not specific to only one study or one GPU slice
+- Correctness fix applied in the clean worktree:
+  - `tune_hyperparameters.py` now raises a dedicated `TrialRunFailedError` for non-zero trial
+    subprocess exits
+  - `study.optimize(..., catch=(TrialRunFailedError,))` now records those trials as failed
+    without aborting the entire Optuna study
+  - this preserves the intended continuation behavior when one DDP trial crashes mid-study
+- Continuation actions already taken:
+  - synced the patched `tune_hyperparameters.py` to the safe remote run root only
+  - relaunched `exp211` continuation onto fresh GPUs `4,5` with the same study / sqlite DB and
+    new `master_port=29683`
+  - after the resilience fix, relaunched `exp210` continuation on GPUs `0,1` with the same study
+    / sqlite DB
+- Real remote state after the fix:
+  - `exp210` study state in sqlite:
+    - trial `0`: `COMPLETE`
+    - trial `1`: `FAIL`
+    - trial `2`: `RUNNING`
+  - `exp211` study state in sqlite:
+    - trial `0`: `FAIL`
+    - trial `1`: `RUNNING`
+  - live tmux windows:
+    - `stage3-exp210-optuna`
+    - `stage3-exp211-optuna`
+- Throughput notes from live logs:
+  - `exp210` prior `TestSubset` speed was about `26.5-27.0 it/s`
+  - with per-rank `batch_size=2` and `world_size=2`, that is about `53-54 items/sec/GPU`
+  - `exp211` retry on GPUs `4,5` has progressed into active training instead of dying during DB
+    load, so the continuation patch plus GPU-slice move cleared the immediate restart blocker
+- Next required action:
+  - keep monitoring both live studies until trial outcomes become informative
+  - if either study completes, sync `best_trial.json`, sqlite, and `/tmp/stage3-exp21x-optuna.log`
+    immediately
+  - only after Optuna completion decide whether a separate `--final-test-only` launch is justified
+
 ## EXP204 salt-only control completion
 
 - Date: 2026-05-15

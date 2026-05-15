@@ -28,6 +28,10 @@ BEST_TEST_SUBSET_RE = re.compile(r"Best TestSubset metrics: (\{.*\})")
 BEST_TEST_RE = re.compile(r"Best test metrics: (\{.*\})")
 
 
+class TrialRunFailedError(RuntimeError):
+    """Raised when one launched training subprocess fails within an Optuna trial."""
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Optuna-based hyperparameter tuning wrapper for main.py",
@@ -644,7 +648,7 @@ def objective_factory(
             lowered = full_output.lower()
             if "out of memory" in lowered or "cuda out of memory" in lowered:
                 raise optuna.TrialPruned("Trial hit CUDA OOM.")
-            raise RuntimeError(f"Trial failed with exit code {return_code}.")
+            raise TrialRunFailedError(f"Trial failed with exit code {return_code}.")
 
         best_metric_regexes = [BEST_VAL_RE]
         if args.model_selection_source == "test_subset":
@@ -822,7 +826,12 @@ def main() -> None:
         higher_is_better=higher_is_better,
         trial_dir=output_dir,
     )
-    study.optimize(objective, n_trials=args.n_trials, timeout=args.timeout)
+    study.optimize(
+        objective,
+        n_trials=args.n_trials,
+        timeout=args.timeout,
+        catch=(TrialRunFailedError,),
+    )
     final_test_result = None
     if args.run_final_test:
         final_test_result = run_final_test(args, study.best_trial.params, output_dir)
