@@ -1119,6 +1119,138 @@
       than flatlining
   - follow-up automation was retargeted from the old Optuna blocker to monitor this live
     screening bundle
+  - mid-run completion update:
+    - `EXP215` / `item-incoterms` finished first while `EXP213` and `EXP214` remained alive
+    - remote tmux window `stage3-exp215` disappeared cleanly, GPU `2` returned idle, and the
+      synced log shows normal early stopping rather than a crash
+    - stopped at train step `2560` with:
+      - best test-subset metrics:
+        `accuracy=0.69921875`, `macro_f1=0.09144316730523627`,
+        `micro_f1=0.69921875`, `mrr=0.7937578209550865`
+      - best test metrics:
+        `accuracy=0.69921875`, `macro_f1=0.09144316730523627`,
+        `micro_f1=0.69921875`, `mrr=0.7937578209550865`
+    - throughput from the finishing evaluation path stayed around `17.7` test items/sec on one
+      GPU, or about `70.8` items/sec/GPU with per-rank `batch_size=4`
+    - scientific reading:
+      - this is effectively unchanged from the repeated active salt-side anchor
+        `mrr=0.7937755766369047` from `EXP206` / `EXP209`
+      - so the narrower postalign-only path has not lost the salt-side reference-positive
+        continuation signal
+      - do not launch salt-side Optuna yet from this partial result alone; wait for the full
+        bundle outcome so the Amazon-side coherence cost is known before deciding whether a
+        genuinely justified next separated Optuna step exists
+
+## EXP213 postalign-only bundle completion
+
+- Date: 2026-05-15
+- Branch: `codex/stage3-clean-p13`
+- Remote completion recheck:
+  - tmux session `lymtmux` returned to only `0:bash`
+  - no live `main.py`, `torch.distributed.run`, or `tune_hyperparameters.py` chain remained
+  - all eight GPUs on `lab25211` were idle again at completion recheck
+- Official artifacts:
+  - candidate:
+    `stage3_notes/candidates/exp213_constraint_conservation_salt_postalign_only.json`
+  - report:
+    `stage3_notes/reports/exp213_constraint_conservation_salt_postalign_only.report.json`
+  - log cache:
+    - `stage3_notes/reports/log_cache/stage3-exp213.log`
+    - `stage3_notes/reports/log_cache/stage3-exp214.log`
+    - `stage3_notes/reports/log_cache/stage3-exp215.log`
+- Final judged screening metrics:
+  - `EXP213` / `user-churn`:
+    - `average_precision=0.7095690195791697`
+    - `accuracy=0.658203125`
+    - `f1=0.7592847317744154`
+    - `roc_auc=0.6569589159856792`
+  - `EXP214` / `user-ltv`:
+    - `r2=0.0307336145961018`
+    - `mae=70.9812234421447`
+    - `rmse=124.71724281213811`
+  - `EXP215` / `item-incoterms`:
+    - `accuracy=0.69921875`
+    - `macro_f1=0.09144316730523627`
+    - `micro_f1=0.69921875`
+    - `mrr=0.7937578209550865`
+- Throughput reading from the finished logs:
+  - `EXP213` / `user-churn`:
+    - visible evaluation throughput settled around `26.3 it/s`
+    - with per-rank `batch_size=3` on one GPU, about `78.9 items/sec/GPU`
+  - `EXP214` / `user-ltv`:
+    - visible evaluation throughput settled around `22.1 it/s`
+    - with per-rank `batch_size=2` on one GPU, about `44.2 items/sec/GPU`
+  - `EXP215` / `item-incoterms`:
+    - visible evaluation throughput settled around `17.7 it/s`
+    - with per-rank `batch_size=4` on one GPU, about `70.8 items/sec/GPU`
+- Bundle-level judgment:
+  - global verdict `failed`
+  - candidate status `retune_plausible`
+- Interpretation:
+  - `user-churn` is screening `better`, but the gain over baseline is tiny and still leaves a
+    meaningful gap to the stored full-test reference, so this task should not take the next Optuna
+    budget
+  - `user-ltv` improved strongly relative to the screening baseline and remains
+    task-locally `retune_plausible`
+  - `item-incoterms` again stayed below the optimistic subset baseline while clearly beating the
+    stored full-test reference band, so the salt-side postalign-only mechanism preserved the same
+    useful continuation signal as the earlier active salt-side path
+- Program consequence:
+  - do not relaunch the same three-task bundle
+  - do not convert the whole bundle into another Amazon-side continuation wave
+  - the next justified step is a separate salt-side single-task Optuna on `item-incoterms` for the
+    genuinely differentiated postalign-only mechanism, still keeping later final full test separate
+
+## EXP216 salt-side postalign-only Optuna launch
+
+- Date: 2026-05-15
+- Branch: `codex/stage3-clean-p13`
+- Why this launch is justified:
+  - `EXP213` formally finished as `global_verdict=failed` but `candidate_status=retune_plausible`
+  - the bundle failure is dominated by the Amazon control tasks, not by loss of the salt-side
+    `item-incoterms` continuation signal
+  - `EXP215` preserved the same reference-positive salt-side signal as the repeated active anchor,
+    while using the genuinely differentiated postalign-only mechanism
+  - therefore the next efficient Stage 3 move is no longer another three-task screen, but a
+    separate salt-side single-task Optuna on `item-incoterms`
+- Study:
+  - `exp216_item_incoterms_part3_salt_postalign_optuna_20260515t130652`
+- Remote launch placement:
+  - target: `lab25211`
+  - safe root only:
+    `/fs/fast/u2021201693/lym/Rel-LLM-codex-stage3-clean-p13`
+  - tmux window: `stage3-exp216-optuna`
+  - GPUs: `0,1`
+  - world size: `2`
+  - per-rank `batch_size` remains an Optuna-tuned hyperparameter, so real global batch is always
+    `batch_size * 2`
+  - master port: `29684`
+- Fixed mechanism boundary for this Optuna:
+  - `gnn_repr_artifact=artifacts/gnn_repr/rel-salt/gnn_repr.pt`
+  - `basis_lambda_postalign_tok=0.1`
+  - `basis_lambda_entity_identity=0.0`
+  - `basis_lambda_branch_orth=0.0`
+  - `basis_gate_strategy=none`
+  - `basis_assignment_topk=4`
+  - keep Optuna and any later final full test strictly separate
+- Live verification after launch:
+  - remote tmux window is alive
+  - the study sqlite DB was created in the safe root
+  - `optuna_runs/exp216_item_incoterms_part3_salt_postalign_optuna_20260515t130652/trial_0000.log`
+    exists
+  - sqlite shows `trial 0` in `RUNNING`
+  - `trial_0000.log` advanced into real training beyond 250 steps rather than dying at startup
+- Early throughput read:
+  - trial 0 is currently in train-only startup, so no subset-test throughput is available yet
+  - visible train speed is about `8.3 step/s` with sampled per-rank `batch_size=1`
+  - that means about `8.3 items/sec/GPU`, or about `16.6` aggregate items/sec, until a later trial
+    samples a different per-rank batch size
+- Next required action:
+  - keep monitoring `exp216` until trial outcomes and subset metrics become informative
+  - once Optuna completes, sync `best_trial.json`, sqlite DB, and `/tmp/stage3-exp216-optuna.log`
+    back to the clean worktree
+  - only then decide whether a separate `--final-test-only` confirmation is scientifically
+    justified for the selected salt-side postalign-only setting
 
 ## EXP204 salt-only control completion
 

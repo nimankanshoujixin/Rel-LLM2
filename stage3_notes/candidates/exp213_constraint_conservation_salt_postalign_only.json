@@ -5,7 +5,7 @@
   "family": "representation_alignment",
   "source_type": "ablation",
   "launch_mode": "parallel",
-  "status": "running",
+  "status": "retune_plausible",
   "task_run_ids": {
     "user-churn": "EXP213",
     "user-ltv": "EXP214",
@@ -160,6 +160,65 @@
       "target": "lab25211",
       "gpu": 2,
       "window_name": "stage3-exp215"
+    }
+  },
+  "task_status": {
+    "user-churn": "completed",
+    "user-ltv": "completed",
+    "item-incoterms": "completed"
+  },
+  "task_results": {
+    "user-churn": {
+      "log_path": "stage3_notes/reports/log_cache/stage3-exp213.log",
+      "stopped_at_train_step": 11264,
+      "selection_source": "test_subset",
+      "best_test_subset_metrics": {
+        "average_precision": 0.7095259652272995,
+        "accuracy": 0.658203125,
+        "f1": 0.7592847317744154,
+        "roc_auc": 0.6569749707001462
+      },
+      "best_test_metrics": {
+        "average_precision": 0.7095690195791697,
+        "accuracy": 0.658203125,
+        "f1": 0.7592847317744154,
+        "roc_auc": 0.6569589159856792
+      },
+      "judgement_note": "Completed cleanly with a small screening gain over the user-churn baseline, but still not enough to justify Optuna-plus-final-test continuation on the user-churn task."
+    },
+    "user-ltv": {
+      "log_path": "stage3_notes/reports/log_cache/stage3-exp214.log",
+      "stopped_at_train_step": 12800,
+      "selection_source": "test_subset",
+      "best_test_subset_metrics": {
+        "r2": 0.030736289090930735,
+        "mae": 70.98155356584583,
+        "rmse": 124.71707074599814
+      },
+      "best_test_metrics": {
+        "r2": 0.0307336145961018,
+        "mae": 70.9812234421447,
+        "rmse": 124.71724281213811
+      },
+      "judgement_note": "Completed cleanly and materially improved the user-ltv screening gate, so the Amazon-side control remains retune-plausible on user-ltv even though the bundle as a whole failed."
+    },
+    "item-incoterms": {
+      "log_path": "stage3_notes/reports/log_cache/stage3-exp215.log",
+      "stopped_at_train_step": 2560,
+      "selection_source": "test_subset",
+      "best_test_subset_metrics": {
+        "accuracy": 0.69921875,
+        "macro_f1": 0.09144316730523627,
+        "micro_f1": 0.69921875,
+        "mrr": 0.7937578209550865
+      },
+      "best_test_metrics": {
+        "accuracy": 0.69921875,
+        "macro_f1": 0.09144316730523627,
+        "micro_f1": 0.69921875,
+        "mrr": 0.7937578209550865
+      },
+      "judgement_note": "Completed cleanly with early stopping and preserved the prior salt-side reference-positive item-incoterms signal almost exactly."
     }
   }
 }

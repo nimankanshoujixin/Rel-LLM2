@@ -90,3 +90,81 @@ First live recheck:
 - all three tmux windows are present
 - `EXP215` is already training normally
 - `EXP213` and `EXP214` are still progressing through Amazon DB preload
+
+Latest live outcome:
+
+- `EXP215` / `item-incoterms` has already completed cleanly while `EXP213` and `EXP214` remain
+  active
+- the synced log shows normal early stopping at train step `2560`, not a runtime failure
+- finishing metrics:
+  - best test-subset `mrr=0.7937578209550865`
+  - best test `mrr=0.7937578209550865`
+- interpretation:
+  - this is effectively unchanged from the repeated active salt-side anchor
+    `mrr=0.7937755766369047`
+  - so removing salt-side entity-identity and branch-orth while keeping post-alignment retention
+    did not destroy the surviving `item-incoterms` continuation signal
+  - the next decision still needs the completed `EXP213` / `EXP214` Amazon-side results before any
+    separate follow-up Optuna is justified
+
+Final bundle outcome:
+
+- official report:
+  `stage3_notes/reports/exp213_constraint_conservation_salt_postalign_only.report.json`
+- bundle-level judgment:
+  - global verdict `failed`
+  - candidate status `retune_plausible`
+- per-task reading:
+  - `EXP213` / `user-churn`
+    - best test `roc_auc=0.6569589159856792`
+    - screening is slightly better than the strict baseline `0.6540209032382359`
+    - still not strong enough to justify a separate user-churn Part 3 Optuna continuation
+  - `EXP214` / `user-ltv`
+    - best test `mae=70.9812234421447`
+    - this is a strong improvement over the screening baseline `79.27257269903086`
+    - under the task rule this remains `retune_plausible`, not a direct bundle winner
+  - `EXP215` / `item-incoterms`
+    - best test `mrr=0.7937578209550865`
+    - still clearly above the stored full-test reference `0.7043105782857789`
+    - so the narrower salt-side postalign-only path preserved the useful reference-positive signal
+
+Next action:
+
+- do **not** rerun the same three-task screening bundle
+- do **not** spend more Amazon-side bundle budget just to keep the control tasks attached
+- the justified next move is a separate salt-side single-task Optuna on `item-incoterms` for this
+  genuinely differentiated postalign-only mechanism
+- keep the normal Stage 3 separation rule:
+  - Optuna first with `periodic_test_steps=512` and `model_selection_source=test_subset`
+  - if the selected best setting is still scientifically worthwhile, run final full test later as
+    a separate `--final-test-only` launch
+
+Live continuation:
+
+- the next justified launch has now started as a separate single-task Optuna:
+  - study:
+    `exp216_item_incoterms_part3_salt_postalign_optuna_20260515t130652`
+  - target: `lab25211`
+  - safe remote root only:
+    `/fs/fast/u2021201693/lym/Rel-LLM-codex-stage3-clean-p13`
+  - GPUs: `0,1`
+  - world size: `2`
+  - master port: `29684`
+  - protocol:
+    - Optuna-only
+    - `periodic_test_steps=512`
+    - `model_selection_source=test_subset`
+    - `max_gpus_per_task=2`
+    - no bundled final full test
+- launch boundary:
+  - this is the differentiated salt-side postalign-only mechanism, not a resume of the earlier
+    `exp212` equivalence class
+  - `basis_lambda_postalign_tok=0.1`
+  - `basis_lambda_entity_identity=0.0`
+  - `basis_lambda_branch_orth=0.0`
+  - `basis_gate_strategy=none`
+  - `basis_assignment_topk=4`
+- first live verification:
+  - remote tmux window `stage3-exp216-optuna` is alive
+  - sqlite study DB and `trial_0000.log` were created in the safe remote root
+  - `trial 0` entered real training and passed 250+ train steps

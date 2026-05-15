@@ -35,7 +35,7 @@ def load_json(path: Path) -> dict[str, Any]:
 
 def dump_json(path: Path, data: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("w", encoding="utf-8") as handle:
+    with path.open("w", encoding="utf-8", newline="\n") as handle:
         json.dump(data, handle, indent=2, ensure_ascii=False)
         handle.write("\n")
 
@@ -1249,8 +1249,19 @@ def parse_metrics_blob(blob: str) -> dict[str, float]:
     return {key: float(value) for key, value in parsed.items()}
 
 
+def read_log_text(log_path: Path) -> str:
+    raw = log_path.read_bytes()
+    if raw.startswith((b"\xff\xfe", b"\xfe\xff")):
+        return raw.decode("utf-16", errors="ignore")
+
+    text = raw.decode("utf-8", errors="ignore")
+    if "\x00" in text:
+        text = text.replace("\x00", "")
+    return text
+
+
 def parse_log(log_path: Path) -> dict[str, Any]:
-    text = log_path.read_text(encoding="utf-8", errors="ignore")
+    text = read_log_text(log_path)
     evaluations = []
     for match in EVAL_RE.finditer(text):
         evaluations.append(
