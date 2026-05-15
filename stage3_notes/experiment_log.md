@@ -1098,6 +1098,27 @@
 - Validation target before launch:
   - run `py_compile`, `git diff --check`, JSON validation, and candidate render / dry-run launch
     validation from the clean worktree
+- Launch status:
+  - static validation passed:
+    - `python -m json.tool stage3_notes/candidates/exp213_constraint_conservation_salt_postalign_only.json`
+    - `python -m py_compile model.py main.py tune_hyperparameters.py stage3_research.py stage3_orchestrator.py`
+    - `git diff --check`
+    - `python stage3_research.py render ... --allow-no-papers`
+    - `python stage3_research.py launch ... --allow-no-papers --dry-run`
+  - committed and pushed registration as `e2c5fb4` on `codex/stage3-clean-p13`
+  - launched for real with:
+    `python stage3_research.py launch stage3_notes/candidates/exp213_constraint_conservation_salt_postalign_only.json --allow-no-papers --skip-sync`
+  - resolved launch placement:
+    - `EXP213` / `user-churn`: target `lab25211`, GPU `0`, tmux window `stage3-exp213`
+    - `EXP214` / `user-ltv`: target `lab25211`, GPU `1`, tmux window `stage3-exp214`
+    - `EXP215` / `item-incoterms`: target `lab25211`, GPU `2`, tmux window `stage3-exp215`
+  - first post-launch recheck:
+    - tmux windows are alive for all three runs
+    - `EXP215` is already past DB load and into normal training on GPU `2`
+    - `EXP213` and `EXP214` are still in Amazon DB preload, but their logs are advancing rather
+      than flatlining
+  - follow-up automation was retargeted from the old Optuna blocker to monitor this live
+    screening bundle
 
 ## EXP204 salt-only control completion
 

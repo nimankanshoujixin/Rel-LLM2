@@ -5,7 +5,7 @@
   "family": "representation_alignment",
   "source_type": "ablation",
   "launch_mode": "parallel",
-  "status": "retune_plausible",
+  "status": "running",
   "task_run_ids": {
     "user-churn": "EXP213",
     "user-ltv": "EXP214",
@@ -144,5 +144,22 @@
     "user-churn": 0,
     "user-ltv": 1,
     "item-incoterms": 2
+  },
+  "task_launches": {
+    "user-churn": {
+      "target": "lab25211",
+      "gpu": 0,
+      "window_name": "stage3-exp213"
+    },
+    "user-ltv": {
+      "target": "lab25211",
+      "gpu": 1,
+      "window_name": "stage3-exp214"
+    },
+    "item-incoterms": {
+      "target": "lab25211",
+      "gpu": 2,
+      "window_name": "stage3-exp215"
+    }
   }
 }

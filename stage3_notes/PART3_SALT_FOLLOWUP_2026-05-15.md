@@ -68,3 +68,25 @@ Hypothesis:
 - do **not** jump directly to Optuna or final full test from registration alone
 - first run normal static validation and rendered-launch validation
 - only if the candidate is clean and launchable should it become the next remote screening wave
+
+## Current execution state
+
+Static validation and local launch validation both passed from the clean worktree:
+
+- `python -m json.tool stage3_notes/candidates/exp213_constraint_conservation_salt_postalign_only.json`
+- `python -m py_compile model.py main.py tune_hyperparameters.py stage3_research.py stage3_orchestrator.py`
+- `git diff --check`
+- `python stage3_research.py render ... --allow-no-papers`
+- `python stage3_research.py launch ... --allow-no-papers --dry-run`
+
+The candidate was then launched on `lab25211` through the safe remote root with:
+
+- `EXP213` / `user-churn` on GPU `0`
+- `EXP214` / `user-ltv` on GPU `1`
+- `EXP215` / `item-incoterms` on GPU `2`
+
+First live recheck:
+
+- all three tmux windows are present
+- `EXP215` is already training normally
+- `EXP213` and `EXP214` are still progressing through Amazon DB preload
