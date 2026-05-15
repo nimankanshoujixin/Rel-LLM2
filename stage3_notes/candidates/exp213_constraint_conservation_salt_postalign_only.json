@@ -1,0 +1,148 @@
+{
+  "bundle_id": "BUNDLE-213",
+  "slug": "constraint_conservation_salt_postalign_only",
+  "title": "Constraint conservation salt postalign-only isolation",
+  "family": "representation_alignment",
+  "source_type": "ablation",
+  "launch_mode": "parallel",
+  "status": "retune_plausible",
+  "task_run_ids": {
+    "user-churn": "EXP213",
+    "user-ltv": "EXP214",
+    "item-incoterms": "EXP215"
+  },
+  "literature": {
+    "queries": [
+      "representation alignment token retention conservative transfer ablation",
+      "post alignment consistency structured transfer negative transfer ablation",
+      "task selective transfer auxiliary loss isolation graph to token alignment"
+    ],
+    "papers": []
+  },
+  "evidence": {
+    "prior_experiments": [
+      "EXP192",
+      "EXP193",
+      "EXP194",
+      "EXP195",
+      "EXP198",
+      "EXP201",
+      "EXP204",
+      "EXP207",
+      "EXP210",
+      "EXP211",
+      "EXP212"
+    ],
+    "why_now": "The live blocker after exp210 and exp211 is no longer Amazon-side continuation but defining a truly differentiated salt-side Part 3 direction. The repeated post-implementation salt-side screens EXP206 and EXP209 kept the same active item-incoterms configuration, so exp212 in that unchanged form would only retune the already screened salt path. The next justified move is therefore a narrower causal isolation: keep Amazon on a Part1-like control under the current code, and test whether salt-side continuation survives when post-alignment token retention is kept but the coupled entity-identity and branch-orth penalties are removed."
+  },
+  "hypothesis": "If the useful salt-side Part 3 signal is mainly coming from preserving token-level basis targets after graph-to-token transfer, then keeping the validated item-incoterms transfer amplitudes plus sparse assignment and post-alignment retention, while removing the extra entity-identity and branch-orth penalties, should remain reference-positive on item-incoterms without needing to relaunch the unchanged exp206 or exp209 setting. If the signal collapses, then post-alignment retention alone is not the real carrying mechanism and later salt-side Optuna should not be spent on this narrower path.",
+  "common_overrides": {
+    "basis_entity_identity_temperature": 0.1
+  },
+  "task_overrides": {
+    "user-churn": {
+      "gnn_repr_artifact": "artifacts/gnn_repr/rel-amazon/gnn_repr.pt",
+      "channels": 256,
+      "num_layers": 2,
+      "num_neighbors": 16,
+      "aggr": "mean",
+      "temporal_strategy": "last",
+      "dropout": 0.4480456499617466,
+      "batch_size": 3,
+      "lr": 0.00021677846214357684,
+      "wd": 0.0016973078532467015,
+      "basis_residual_alpha": 0.23783495141695055,
+      "basis_graph_alpha": 0.05552695261768256,
+      "basis_tau": 0.037659918741014,
+      "basis_lambda_tok": 0.31528154175096096,
+      "basis_lambda_g": 2.470540427082327,
+      "basis_lambda_sharp": 0.0009324140221663494,
+      "basis_lambda_postalign_tok": 0.0,
+      "basis_lambda_entity_identity": 0.0,
+      "basis_lambda_branch_orth": 0.0,
+      "basis_gate_strategy": "none",
+      "basis_gate_token_floor": 0.0,
+      "basis_gate_graph_floor": 0.0,
+      "basis_assignment_topk": 0,
+      "loss_class_weight": [
+        1.0,
+        1.7768682564439144
+      ]
+    },
+    "user-ltv": {
+      "gnn_repr_artifact": "artifacts/gnn_repr/rel-amazon/gnn_repr.pt",
+      "channels": 256,
+      "num_layers": 2,
+      "num_neighbors": 32,
+      "aggr": "mean",
+      "temporal_strategy": "last",
+      "dropout": 0.1792328642721363,
+      "batch_size": 2,
+      "lr": 0.0008138233922650508,
+      "wd": 1.9777828512462715e-06,
+      "basis_residual_alpha": 0.2624967163228772,
+      "basis_graph_alpha": 0.029898561484575426,
+      "basis_tau": 0.1160833330578411,
+      "basis_lambda_tok": 1.329755409073867,
+      "basis_lambda_g": 0.6746437142284308,
+      "basis_lambda_sharp": 0.020554245520150755,
+      "basis_lambda_postalign_tok": 0.0,
+      "basis_lambda_entity_identity": 0.0,
+      "basis_lambda_branch_orth": 0.0,
+      "basis_gate_strategy": "none",
+      "basis_gate_token_floor": 0.0,
+      "basis_gate_graph_floor": 0.0,
+      "basis_assignment_topk": 0,
+      "loss_class_weight": [
+        1.0,
+        2.7180318564408164
+      ]
+    },
+    "item-incoterms": {
+      "gnn_repr_artifact": "artifacts/gnn_repr/rel-salt/gnn_repr.pt",
+      "channels": 256,
+      "num_layers": 2,
+      "num_neighbors": 32,
+      "aggr": "mean",
+      "temporal_strategy": "last",
+      "dropout": 0.4474136752138244,
+      "batch_size": 4,
+      "lr": 0.0008319514671870782,
+      "wd": 0.005727904470799624,
+      "basis_residual_alpha": 0.4229318791183682,
+      "basis_graph_alpha": 0.08918833167339732,
+      "basis_tau": 0.05111938883158829,
+      "basis_lambda_tok": 0.633326877532184,
+      "basis_lambda_g": 0.16149614799999182,
+      "basis_lambda_sharp": 0.025502980701628937,
+      "basis_lambda_postalign_tok": 0.1,
+      "basis_lambda_entity_identity": 0.0,
+      "basis_lambda_branch_orth": 0.0,
+      "basis_gate_strategy": "none",
+      "basis_gate_token_floor": 0.0,
+      "basis_gate_graph_floor": 0.0,
+      "basis_assignment_topk": 4,
+      "loss_class_weight": [
+        1.0,
+        1.1783725794347397
+      ]
+    }
+  },
+  "notes": [
+    "This is a screening-only salt-side follow-up after exp212 was stopped because the unchanged active salt-side path had already been screened repeatedly in EXP206 and EXP209.",
+    "The causal change is intentionally narrow: Amazon tasks stay on Part1-like controls under the current code, while item-incoterms keeps only post-alignment token retention on top of the validated transfer amplitudes.",
+    "Do not run Optuna or final full test from this candidate directly.",
+    "If item-incoterms loses its reference-positive continuation signal here, the next salt-side move should not be another near-duplicate postalign-only retune.",
+    "Scientific interpretation still follows the Stage 3 task-aware rule set: user-ltv subset/full-test scale mismatch remains active, and item-incoterms should still be judged scientifically against the stored full-test reference band rather than only the optimistic subset baseline."
+  ],
+  "task_targets": {
+    "user-churn": "lab25211",
+    "user-ltv": "lab25211",
+    "item-incoterms": "lab25211"
+  },
+  "task_gpus": {
+    "user-churn": 0,
+    "user-ltv": 1,
+    "item-incoterms": 2
+  }
+}

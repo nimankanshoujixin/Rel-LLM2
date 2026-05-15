@@ -443,3 +443,31 @@ So the next concrete blocker is now narrower and more scientific:
 - do **not** keep launching salt-side-only Optuna jobs that are mechanically equivalent to
   `exp194`
 - instead, define a truly differentiated salt-side Part 3 candidate before the next Optuna launch
+
+## Salt-side boundary correction
+
+The follow-up inspection after `exp212` exposed an important boundary nuance:
+
+- several Part 3-related flags already appeared in earlier Phase 2 command records because the CLI
+  plumbing existed before the real Part 3 implementation path was active
+- so command overlap with `exp194` is not, by itself, enough to define a live active-mechanism
+  equivalence class under the current code
+
+The more reliable active salt-side anchors are the post-implementation screens:
+
+- `EXP206` / `item-incoterms`
+- `EXP209` / `item-incoterms`
+
+Those two runs repeated the same active salt-side path and landed on the same judged metric
+`mrr=0.7937755766369047`.
+
+Therefore the correct blocker is:
+
+- do not resume `exp212` as an unchanged retune of that already-screened active salt path
+- instead isolate which salt-side conservation component is actually carrying the surviving
+  `item-incoterms` signal
+
+The first registered follow-up for that correction is
+`stage3_notes/candidates/exp213_constraint_conservation_salt_postalign_only.json`, which keeps
+Amazon on Part1-like controls and tests whether salt-side post-alignment retention alone can carry
+the reference-positive continuation signal.

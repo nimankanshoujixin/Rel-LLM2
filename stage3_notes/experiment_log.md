@@ -1054,6 +1054,51 @@
   - the next justified Part 3 step must first define a truly differentiated salt-side candidate,
     not just repackage the validated `exp194` baseline
 
+## EXP213 salt-side boundary correction and next candidate
+
+- Date: 2026-05-15
+- Branch: `codex/stage3-clean-p13`
+- Remote recheck before continuing:
+  - `lymtmux` has returned to only `0:bash`
+  - all eight GPUs on `lab25211` are currently idle
+  - no live `tune_hyperparameters.py`, `torch.distributed.run`, or `main.py` chain remains
+- Boundary correction:
+  - the earlier `exp212` stop decision should not be interpreted as "Phase 2 `exp194` already
+    functionally used the full active Part 3 salt path just because the command line contained the
+    same flag names"
+  - the tighter and more useful reading is:
+    - pre-implementation command overlap is insufficient by itself because the real active Part 3
+      path only became live after the 2026-05-15 implementation checkpoint
+    - the true active salt-side equivalence class to avoid retuning blindly is the repeated
+      post-implementation screen used in `EXP206` and `EXP209`
+    - both active screens landed on the same judged `item-incoterms` metric
+      `mrr=0.7937755766369047`
+- Consequence:
+  - `exp212` should still remain stopped, but for the tighter reason that it would have retuned the
+    unchanged active salt-side path already screened in `EXP206` / `EXP209`
+  - the next justified move is to isolate which salt-side conservation term is actually carrying
+    the surviving `item-incoterms` signal
+- New candidate:
+  - registered
+    `stage3_notes/candidates/exp213_constraint_conservation_salt_postalign_only.json`
+  - run ids:
+    - `EXP213` / `user-churn`
+    - `EXP214` / `user-ltv`
+    - `EXP215` / `item-incoterms`
+  - design:
+    - keep `user-churn` and `user-ltv` on Part1-like controls under the current code
+    - keep the validated `item-incoterms` transfer amplitudes and sparse `topk=4`
+    - keep only salt-side `basis_lambda_postalign_tok=0.1`
+    - set salt-side `basis_lambda_entity_identity=0.0`
+    - set salt-side `basis_lambda_branch_orth=0.0`
+  - hypothesis:
+    - if the surviving salt-side signal mainly comes from post-alignment target retention, this
+      narrower path should stay reference-positive on `item-incoterms`
+    - if it collapses, later salt-side Optuna should not be spent on postalign-only retuning
+- Validation target before launch:
+  - run `py_compile`, `git diff --check`, JSON validation, and candidate render / dry-run launch
+    validation from the clean worktree
+
 ## EXP204 salt-only control completion
 
 - Date: 2026-05-15
