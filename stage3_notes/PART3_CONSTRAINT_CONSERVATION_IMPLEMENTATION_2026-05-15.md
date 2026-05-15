@@ -392,11 +392,11 @@ the actual hybrid screening path.
 
 ## Part 3 task-specific Optuna status update
 
-The first limited task-specific Part 3 Optuna continuation is now split into two different
-real-world states:
+The first limited task-specific Part 3 Optuna continuation has now completed on both Amazon-side
+tasks:
 
-- `exp210_user_churn_part3_hybrid_optuna_20260515t073925` has completed
-- `exp211_user_ltv_part3_hybrid_optuna_20260515t073925` is still the only live Optuna blocker
+- `exp210_user_churn_part3_hybrid_optuna_20260515t073925` completed
+- `exp211_user_ltv_part3_hybrid_optuna_20260515t073925` also completed
 
 Current reading for `exp210`:
 
@@ -407,9 +407,39 @@ Current reading for `exp210`:
 - but it still stays below the stored user-churn full-test reference
   `roc_auc=0.6918065868366201`
 
+Current reading for `exp211`:
+
+- best subset metric:
+  - `mae=82.58232443728252`
+- under the user-ltv task rule this is only a continuation gate, not a final scientific scale
+- but even that gate failed:
+  - it is worse than the earlier `EXP207` screening `mae=79.51790131831658`
+  - it is worse than the validated Phase 1 user-ltv Optuna subset best
+    `mae=70.44936827350408`
+
 Program consequence:
 
-- for user-churn, screening and full-test scales are close enough that this gap matters directly
+- for user-churn, screening and full-test scales are close enough that the remaining gap matters
+  directly
 - so `exp210` should **not** advance to a separate `--final-test-only` confirmation
-- instead, preserve the result as evidence that the task-specific Part 3 hybrid path is more
-  plausible than the earlier coarse bundles, while keeping the live decision focus on `exp211`
+- for user-ltv, the subset continuation gate also failed, so `exp211` should **not** advance to a
+  separate `--final-test-only` confirmation either
+- the Amazon-side Part 3 Optuna wave is therefore complete and should be retired as an active
+  launch target
+
+## Salt-side continuation correction
+
+An attempted next-step launch as a salt-side-only Part 3 Optuna (`exp212`) was stopped after the
+startup recheck because it was not a genuinely new Part 3 direction:
+
+- the intended `item-incoterms` salt-side setting is effectively the same as the already validated
+  `exp194` baseline on the substantive mechanism controls
+- that means a fresh Optuna there would mostly retune an already tuned and full-tested baseline,
+  not test a differentiated Part 3 hypothesis
+
+So the next concrete blocker is now narrower and more scientific:
+
+- do **not** keep launching Amazon-side Part 3 retunes that already failed their continuation gates
+- do **not** keep launching salt-side-only Optuna jobs that are mechanically equivalent to
+  `exp194`
+- instead, define a truly differentiated salt-side Part 3 candidate before the next Optuna launch

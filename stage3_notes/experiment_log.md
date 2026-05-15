@@ -919,11 +919,12 @@
   - `exp211` retry on GPUs `4,5` has progressed into active training instead of dying during DB
     load, so the continuation patch plus GPU-slice move cleared the immediate restart blocker
 - Next required action:
-  - `exp210` has now completed and should no longer be monitored as live
-  - keep monitoring only `exp211` until its trial outcomes become informative or the study ends
-  - if `exp211` completes, sync `best_trial.json`, sqlite, and `/tmp/stage3-exp211-optuna.log`
-    immediately
-  - only after `exp211` completion decide whether a separate `--final-test-only` launch is justified
+  - `exp210` and `exp211` have now both completed and should no longer be monitored as live
+  - persist the completed `exp211` result and judge whether it justifies a separate
+    `--final-test-only` launch under the user-ltv task rule
+  - if the user-ltv continuation gate fails, do not spend full-test budget on it
+  - then retarget the program to the next concrete Part 3 blocker rather than keeping a stale
+    live-run monitor
 
 ## EXP210 Part 3 user-churn Optuna completion
 
@@ -973,6 +974,85 @@
   - do **not** launch a separate `--final-test-only` run for `exp210`
   - treat this as useful Part 3 continuation evidence, but not yet a strong enough
     user-churn winner to spend a full-test confirmation on
+
+## EXP211 Part 3 user-ltv Optuna completion
+
+- Date: 2026-05-15
+- Branch: `codex/stage3-clean-p13`
+- Study:
+  - `exp211_user_ltv_part3_hybrid_optuna_20260515t073925`
+- Remote completion recheck:
+  - tmux session `lymtmux` returned to only `0:bash`
+  - no live `exp211` `tune_hyperparameters.py` / `torch.distributed.run` / `main.py` chain remained
+  - all eight GPUs were idle again after completion
+- Synced local artifacts:
+  - `optuna_runs/exp211_user_ltv_part3_hybrid_optuna_20260515t073925/best_trial.json`
+  - `optuna_runs/exp211_user_ltv_part3_hybrid_optuna_20260515t073925/stage3_optuna_exp211_user_ltv_part3_hybrid_20260515t073925.db`
+  - `stage3_notes/reports/log_cache/stage3-exp211-optuna-20260515.log`
+- Final Optuna outcome:
+  - sqlite ended with thirteen failed trials and one completed trial under the resilience patch
+  - `best_trial.json` recorded best trial `13`
+  - best subset metric:
+    - `mae=82.58232443728252`
+  - best fixed Part 3 hybrid setting:
+    - `lr=0.000425585549072793`
+    - `wd=0.00018760068220300674`
+    - `dropout=0.04683738391404624`
+    - `channels=256`
+    - `num_layers=2`
+    - `num_neighbors=128`
+    - `aggr=mean`
+    - `temporal_strategy=last`
+    - per-rank `batch_size=2`, so real global batch was `4` under 2-rank DDP
+    - `w_pos=1.7312942345471598`
+    - `basis_residual_alpha=0.13785934450912002`
+    - `basis_graph_alpha=0.18061302881537633`
+    - `basis_tau=0.05110366627253599`
+    - `basis_lambda_tok=0.10862195895119266`
+    - `basis_lambda_g=0.8983402272488594`
+    - `basis_lambda_sharp=0.00033988503110784585`
+- Throughput note from the completing subset test:
+  - visible `TestSubset` speed finished around `24.8 it/s`
+  - with per-rank `batch_size=2` on 2 ranks, that is about `49.6 items/sec/GPU`
+- Scientific reading:
+  - for user-ltv, subset MAE is only a continuation gate rather than a final scientific scale
+  - however, this gate still failed clearly:
+    - it is worse than `EXP207` / `EXP208` screening `mae=79.51790131831658`
+    - it is worse than the earlier validated Phase 1 user-ltv Optuna best subset
+      `mae=70.44936827350408`
+  - so the Part 3 Amazon-side user-ltv retune did not preserve even task-local non-regression
+- Decision:
+  - do **not** launch a separate `--final-test-only` run for `exp211`
+  - retire the Amazon-side user-ltv Part 3 Optuna continuation as a current launch target
+
+## EXP212 salt-side-only Part 3 Optuna abort
+
+- Date: 2026-05-15
+- Branch: `codex/stage3-clean-p13`
+- Temporary launch:
+  - `exp212_item_incoterms_part3_salt_optuna_20260515t105909`
+  - launched in safe remote root only, tmux window `stage3-exp212-optuna`, GPUs `0,1`, Optuna-only
+- Why it was stopped quickly:
+  - the immediate follow-up scientific check showed the intended salt-side `item-incoterms`
+    configuration is not actually a new Part 3 mechanism family relative to the already validated
+    `exp194_item_incoterms_optuna_20260513t2307` baseline
+  - the substantive salt-side controls are effectively the same:
+    - same `rel-salt` GNN artifact
+    - same validated Phase 2 best hyperparameters
+    - same `basis_lambda_postalign_tok=0.1`
+    - same `basis_lambda_entity_identity=0.05`
+    - same `basis_lambda_branch_orth=0.02`
+    - same `basis_gate_strategy=none`
+    - same sparse assignment intent with `basis_assignment_topk=4`
+  - therefore a fresh item-incoterms-only Part 3 Optuna would spend budget retuning an already
+    tuned and full-tested baseline rather than a differentiated new Part 3 candidate
+- Remote cleanup result:
+  - `stage3-exp212-optuna` was intentionally killed before substantive progress
+  - the current next blocker is no longer live monitoring
+- Consequence:
+  - do not continue `exp212` in its current form
+  - the next justified Part 3 step must first define a truly differentiated salt-side candidate,
+    not just repackage the validated `exp194` baseline
 
 ## EXP204 salt-only control completion
 

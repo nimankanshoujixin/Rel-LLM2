@@ -1,0 +1,42 @@
+{
+  "study_name": "exp211_user_ltv_part3_hybrid_optuna_20260515t073925",
+  "best_trial": 13,
+  "best_value": 82.58232443728252,
+  "best_params": {
+    "lr": 0.000425585549072793,
+    "wd": 0.00018760068220300674,
+    "dropout": 0.04683738391404624,
+    "channels": 256,
+    "num_layers": 2,
+    "num_neighbors": 128,
+    "aggr": "mean",
+    "temporal_strategy": "last",
+    "batch_size": 2,
+    "w_pos": 1.7312942345471598,
+    "basis_residual_alpha": 0.13785934450912002,
+    "basis_graph_alpha": 0.18061302881537633,
+    "basis_tau": 0.05110366627253599,
+    "basis_lambda_tok": 0.10862195895119266,
+    "basis_lambda_g": 0.8983402272488594,
+    "basis_lambda_sharp": 0.00033988503110784585
+  },
+  "best_user_attrs": {
+    "aggr": "mean",
+    "basis_graph_alpha": 0.18061302881537633,
+    "basis_lambda_g": 0.8983402272488594,
+    "basis_lambda_sharp": 0.00033988503110784585,
+    "basis_lambda_tok": 0.10862195895119266,
+    "basis_residual_alpha": 0.13785934450912002,
+    "basis_tau": 0.05110366627253599,
+    "batch_size": 2,
+    "channels": 256,
+    "command": "/fs/fast/u2021201693/lym/Rel-LLM-codex-stage3-clean-p13/conda/envs/bin/python -m torch.distributed.run --nproc_per_node=2 --master_port=29683 main.py --dataset=rel-amazon --task=user-ltv --model_type=./Llama-3.2-1B --text_embedder=mpnet --train_steps=32768 --val_steps=512 --eval_steps=512 --test_steps=512 --periodic_test_steps=512 --model_selection_source=test_subset --early_stop_patience=4 --early_stop_metric_delta=0.001 --early_stop_loss_delta=0.0005 --val_size=1 --channels=256 --num_layers=2 --num_neighbors=128 --aggr=mean --temporal_strategy=last --dropout=0.04683738391404624 --batch_size=2 --lr=0.000425585549072793 --wd=0.00018760068220300674 --seed=42 --basis_root=artifacts/basis --basis_tau=0.05110366627253599 --basis_residual_alpha=0.13785934450912002 --basis_graph_alpha=0.18061302881537633 --basis_lambda_tok=0.10862195895119266 --basis_lambda_g=0.8983402272488594 --basis_lambda_sharp=0.00033988503110784585 --basis_lambda_postalign_tok=0.0 --basis_lambda_entity_identity=0.0 --basis_entity_identity_temperature=0.1 --basis_lambda_branch_orth=0.0 --basis_gate_strategy=none --basis_gate_token_floor=0.0 --basis_gate_graph_floor=0.0 --basis_assignment_topk=4 --loss_class_weight 1.0 1.7312942345471598 --cache_dir=/home/u2021201693/.cache/relbench_examples --gnn_repr_artifact=artifacts/gnn_repr/rel-amazon/gnn_repr.pt --llm_frozen --debug",
+    "dropout": 0.04683738391404624,
+    "lr": 0.000425585549072793,
+    "num_layers": 2,
+    "num_neighbors": 128,
+    "temporal_strategy": "last",
+    "w_pos": 1.7312942345471598,
+    "wd": 0.00018760068220300674
+  }
+}
